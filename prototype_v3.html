@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forkyou — Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Serif+Display:ital@0;1&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #FAFAF8; --surface: #F2F2EF; --surface2: #E8E8E4;
+    --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+    --text: #1A1A18; --text2: #6B6B66; --text3: #A8A8A2;
+    --accent: #D4522A; --info: #2A6DD4;
+    --radius: 12px; --radius-sm: 8px; --nav-h: 72px; --top-h: 56px;
+  }
+  body { background: #E0DDD6; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'DM Sans', sans-serif; padding: 24px 16px; }
+  .device-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .device-label { font-size: 12px; letter-spacing: 0.08em; color: #888; text-transform: uppercase; }
+  .phone { width: 375px; height: 780px; background: #1A1A18; border-radius: 44px; padding: 12px; box-shadow: 0 40px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08); position: relative; }
+  .phone-notch { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 120px; height: 30px; background: #1A1A18; border-radius: 20px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--bg); border-radius: 34px; overflow: hidden; position: relative; }
+  .status-bar { height: 44px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 24px 6px; background: var(--bg); position: relative; z-index: 10; flex-shrink: 0; }
+  .status-time { font-size: 13px; font-weight: 600; color: var(--text); }
+  .status-icons span { font-size: 11px; color: var(--text); }
+  .view { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; flex-direction: column; background: var(--bg); }
+  .view.active { display: flex; }
+  .view-content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .view-content::-webkit-scrollbar { display: none; }
+  .top-bar { height: var(--top-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg); border-bottom: 0.5px solid var(--border); flex-shrink: 0; position: relative; z-index: 5; }
+  .app-wordmark { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); letter-spacing: -0.5px; }
+  .wordmark-dot { color: var(--accent); }
+  .icon-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; transition: background 0.15s; }
+  .icon-btn:active { background: var(--surface2); }
+  .icon-btn svg { width: 17px; height: 17px; stroke: var(--text2); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs { display: flex; padding: 0 16px; gap: 24px; border-bottom: 0.5px solid var(--border); background: var(--bg); flex-shrink: 0; }
+  .tab { font-size: 13px; padding: 10px 0; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; transition: color 0.15s; user-select: none; }
+  .tab.active { color: var(--text); font-weight: 500; border-bottom-color: var(--text); }
+  .feed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
+  .post-card { border-radius: var(--radius); overflow: hidden; background: var(--surface); cursor: pointer; transition: transform 0.15s, opacity 0.15s; border: 0.5px solid var(--border); }
+  .post-card:active { transform: scale(0.97); opacity: 0.9; }
+  .post-img { width: 100%; display: flex; align-items: center; justify-content: center; background: var(--surface2); }
+  .post-img svg { opacity: 0.35; }
+  .post-info { padding: 7px 9px 8px; }
+  .post-title-sm { font-size: 11.5px; color: var(--text); line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .post-meta { display: flex; align-items: center; justify-content: space-between; }
+  .creator-row-sm { display: flex; align-items: center; gap: 4px; }
+  .avatar-sm { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 6.5px; font-weight: 600; flex-shrink: 0; }
+  .creator-name-sm { font-size: 10px; color: var(--text2); }
+  .like-count { display: flex; align-items: center; gap: 3px; font-size: 10px; color: var(--text3); }
+  .like-count svg { width: 10px; height: 10px; stroke: var(--text3); fill: none; stroke-width: 1.5; }
+  .bottom-nav { height: var(--nav-h); display: flex; align-items: center; justify-content: space-around; border-top: 0.5px solid var(--border); background: var(--bg); padding: 0 8px 10px; flex-shrink: 0; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; flex: 1; padding: 6px 0; border-radius: var(--radius-sm); border: none; background: none; }
+  .nav-item svg { width: 22px; height: 22px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.15s; }
+  .nav-item.active svg { stroke: var(--text); }
+  .nav-label { font-size: 9.5px; color: var(--text3); transition: color 0.15s; }
+  .nav-item.active .nav-label { color: var(--text); font-weight: 500; }
+  .post-fab { width: 42px; height: 42px; border-radius: 13px; background: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; transition: transform 0.15s; }
+  .post-fab:active { transform: scale(0.93); }
+  .post-fab svg { width: 18px; height: 18px; stroke: var(--bg); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .back-bar { height: var(--top-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg); border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .back-btn { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--text2); cursor: pointer; background: none; border: none; padding: 6px 0; }
+  .back-btn svg { width: 16px; height: 16px; stroke: var(--text2); fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  .post-photo { width: 100%; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; }
+  .photo-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; }
+  .pdot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.5); }
+  .pdot.active { background: #fff; width: 14px; border-radius: 3px; }
+  .actions-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .actions-left { display: flex; gap: 16px; align-items: center; }
+  .action-btn { display: flex; align-items: center; gap: 4px; cursor: pointer; background: none; border: none; padding: 4px 0; }
+  .action-btn svg { width: 21px; height: 21px; stroke: var(--text2); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.15s, fill 0.15s; }
+  .action-btn.liked svg { stroke: #E24B4A; fill: #E24B4A; }
+  .action-btn.saved svg { stroke: var(--text); fill: var(--text); }
+  .action-count { font-size: 11px; color: var(--text3); }
+  .follow-pill { font-size: 12px; font-weight: 500; padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border2); color: var(--text); cursor: pointer; background: transparent; transition: background 0.15s, color 0.15s; }
+  .follow-pill.following { background: var(--surface); color: var(--text2); border-color: var(--border); }
+  .post-content { padding: 14px 16px 0; }
+  .creator-row { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; }
+  .avatar-md { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+  .creator-handle { font-size: 12px; font-weight: 500; color: var(--text); }
+  .post-timestamp { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  .post-title-full { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.45; margin-bottom: 9px; letter-spacing: -0.1px; }
+  .post-body-text { font-size: 13px; color: var(--text2); line-height: 1.65; margin-bottom: 13px; }
+  .ratings-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .rating-chip { background: var(--surface); border-radius: var(--radius-sm); padding: 7px 10px; flex: 1; display: flex; flex-direction: column; gap: 4px; border: 0.5px solid var(--border); }
+  .rating-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stars { display: flex; gap: 1.5px; }
+  .star { font-size: 10px; color: var(--surface2); }
+  .star.on { color: #EF9F27; }
+  .dollar { font-size: 10px; color: var(--surface2); font-weight: 500; }
+  .dollar.on { color: #1D9E75; }
+  .location-pill { display: inline-flex; align-items: center; gap: 5px; background: var(--surface); border-radius: 20px; padding: 5px 12px; font-size: 12px; color: var(--text2); margin-bottom: 10px; border: 0.5px solid var(--border); cursor: pointer; }
+  .location-pill svg { width: 11px; height: 11px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  .hashtags { display: flex; flex-wrap: wrap; gap: 5px; padding-bottom: 14px; }
+  .hashtag { font-size: 12px; color: var(--info); cursor: pointer; }
+  .comments-section { border-top: 0.5px solid var(--border); padding: 12px 16px; }
+  .comments-heading { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 10px; }
+  .comment { display: flex; gap: 8px; margin-bottom: 10px; }
+  .avatar-xs { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 600; flex-shrink: 0; }
+  .comment-handle { font-size: 11px; font-weight: 500; color: var(--text); }
+  .comment-text { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .comment-input-bar { display: flex; align-items: center; gap: 9px; padding: 8px 16px 16px; border-top: 0.5px solid var(--border); background: var(--bg); flex-shrink: 0; }
+  .comment-field { flex: 1; background: var(--surface); border: none; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text); outline: none; }
+  .comment-field::placeholder { color: var(--text3); }
+  .send-btn { background: none; border: none; cursor: pointer; padding: 4px; }
+  .send-btn svg { width: 18px; height: 18px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  .search-top { padding: 10px 16px 0; background: var(--bg); border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .search-input-wrap { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 12px; padding: 9px 14px; margin-bottom: 12px; }
+  .search-input-wrap svg { width: 16px; height: 16px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; flex-shrink: 0; }
+  .search-field { flex: 1; background: none; border: none; outline: none; font-size: 14px; font-family: 'DM Sans', sans-serif; color: var(--text); }
+  .search-field::placeholder { color: var(--text3); }
+  .clear-btn { background: var(--surface2); border: none; border-radius: 50%; width: 18px; height: 18px; display: none; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .clear-btn.visible { display: flex; }
+  .clear-btn svg { width: 10px; height: 10px; stroke: var(--text2); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .category-chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
+  .category-chips::-webkit-scrollbar { display: none; }
+  .chip { display: flex; align-items: center; gap: 5px; white-space: nowrap; padding: 6px 13px; border-radius: 20px; font-size: 12px; background: var(--surface); color: var(--text2); border: 0.5px solid var(--border); cursor: pointer; transition: background 0.15s, color 0.15s; flex-shrink: 0; }
+  .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .search-section-label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; padding: 14px 16px 8px; }
+  .trending-list { padding: 0 16px; }
+  .trending-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+  .trending-item:last-child { border-bottom: none; }
+  .trending-rank { font-size: 13px; font-weight: 500; color: var(--text3); width: 20px; text-align: center; flex-shrink: 0; }
+  .trending-rank.hot { color: var(--accent); }
+  .trending-tag { font-size: 13px; color: var(--text); flex: 1; }
+  .trending-count { font-size: 11px; color: var(--text3); }
+  .results-label { font-size: 12px; color: var(--text2); padding: 6px 8px 10px; }
+  .no-results { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 14px; }
+  .create-top { height: var(--top-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .create-title { font-size: 15px; font-weight: 500; color: var(--text); }
+  .post-btn { background: var(--text); color: var(--bg); border: none; border-radius: 20px; padding: 7px 16px; font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity 0.15s; }
+  .post-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .create-scroll { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  .create-scroll::-webkit-scrollbar { display: none; }
+  .photo-upload-area { margin: 14px 16px; border: 1.5px dashed var(--border2); border-radius: var(--radius); aspect-ratio: 4/3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; background: var(--surface); }
+  .upload-icon svg { width: 28px; height: 28px; stroke: var(--text3); fill: none; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+  .upload-label { font-size: 13px; color: var(--text2); font-weight: 500; }
+  .upload-sublabel { font-size: 11px; color: var(--text3); }
+  .photo-preview-strip { display: flex; gap: 6px; padding: 0 16px 14px; overflow-x: auto; scrollbar-width: none; }
+  .photo-preview-strip::-webkit-scrollbar { display: none; }
+  .preview-thumb { width: 56px; height: 56px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+  .preview-thumb.add-more { border: 1.5px dashed var(--border2); background: var(--surface); }
+  .preview-thumb.add-more svg { width: 18px; height: 18px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  .thumb-remove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: var(--text); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .thumb-remove svg { width: 8px; height: 8px; stroke: var(--bg); fill: none; stroke-width: 2.5; stroke-linecap: round; }
+  .create-section { padding: 14px 16px 0; }
+  .title-input { width: 100%; background: none; border: none; outline: none; font-size: 16px; font-weight: 500; font-family: 'DM Sans', sans-serif; color: var(--text); padding: 0; line-height: 1.4; resize: none; }
+  .title-input::placeholder { color: var(--text3); }
+  .divider { height: 0.5px; background: var(--border); margin: 14px 16px; }
+  .body-input { width: 100%; background: none; border: none; outline: none; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text2); padding: 0; line-height: 1.65; resize: none; min-height: 80px; }
+  .body-input::placeholder { color: var(--text3); }
+  .create-ratings { display: flex; gap: 8px; padding: 0 16px; margin-bottom: 14px; }
+  .create-rating-chip { flex: 1; background: var(--surface); border-radius: var(--radius-sm); border: 0.5px solid var(--border); padding: 9px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .create-rating-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .tap-stars { display: flex; gap: 2px; }
+  .tap-star { font-size: 14px; color: var(--surface2); cursor: pointer; transition: color 0.1s, transform 0.1s; user-select: none; line-height: 1; }
+  .tap-star.on { color: #EF9F27; }
+  .tap-star:active { transform: scale(1.3); }
+  .tap-dollars { display: flex; gap: 1px; }
+  .tap-dollar { font-size: 11px; font-weight: 600; color: var(--surface2); cursor: pointer; transition: color 0.1s; user-select: none; padding: 1px; }
+  .tap-dollar.on { color: #1D9E75; }
+  .location-input-wrap { display: flex; align-items: center; gap: 9px; background: var(--surface); border-radius: var(--radius-sm); padding: 10px 13px; margin: 0 16px 14px; border: 0.5px solid var(--border); cursor: pointer; }
+  .location-input-wrap svg { width: 15px; height: 15px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; flex-shrink: 0; }
+  .location-input-wrap span { font-size: 13px; color: var(--text3); }
+  .location-input-wrap.filled span { color: var(--text2); }
+  .location-clear { margin-left: auto; font-size: 11px; color: var(--text3); cursor: pointer; }
+  .hashtag-input-wrap { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; background: var(--surface); border-radius: var(--radius-sm); padding: 8px 13px; margin: 0 16px 6px; border: 0.5px solid var(--border); min-height: 40px; }
+  .hashtag-token { background: var(--info); border-radius: 20px; padding: 3px 9px; font-size: 11px; color: #fff; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .hashtag-field { border: none; background: none; outline: none; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text); flex: 1; min-width: 80px; }
+  .hashtag-field::placeholder { color: var(--text3); }
+  .hashtag-hint { font-size: 11px; color: var(--text3); padding: 0 16px 16px; }
+  .char-count { font-size: 10px; color: var(--text3); text-align: right; padding: 2px 16px 0; }
+  .location-modal { display: none; position: absolute; bottom: 0; left: 0; right: 0; background: var(--bg); border-radius: var(--radius) var(--radius) 0 0; border-top: 0.5px solid var(--border); z-index: 50; padding: 0 0 20px; }
+  .location-modal.open { display: block; }
+  .modal-handle { width: 36px; height: 4px; background: var(--surface2); border-radius: 2px; margin: 10px auto 14px; }
+  .modal-title { font-size: 14px; font-weight: 500; color: var(--text); padding: 0 16px 10px; }
+  .modal-search { display: flex; align-items: center; gap: 8px; background: var(--surface); border-radius: 10px; padding: 8px 13px; margin: 0 16px 10px; }
+  .modal-search svg { width: 15px; height: 15px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; flex-shrink: 0; }
+  .modal-search input { flex: 1; border: none; background: none; outline: none; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text); }
+  .modal-search input::placeholder { color: var(--text3); }
+  .location-results { padding: 0 16px; }
+  .location-result { padding: 11px 0; border-bottom: 0.5px solid var(--border); cursor: pointer; }
+  .location-result:last-child { border-bottom: none; }
+  .location-result-name { font-size: 13px; color: var(--text); }
+  .location-result-suburb { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .modal-backdrop { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.3); z-index: 40; }
+  .modal-backdrop.open { display: block; }
+
+  /* PROFILE */
+  .profile-top-bar { height: var(--top-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .profile-username { font-size: 15px; font-weight: 500; color: var(--text); }
+  .profile-top-actions { display: flex; gap: 8px; }
+  .profile-header { padding: 20px 16px 16px; }
+  .profile-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .profile-avatar { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; flex-shrink: 0; }
+  .profile-stats { display: flex; gap: 0; flex: 1; }
+  .profile-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+  .profile-stat-num { font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  .profile-stat-label { font-size: 10px; color: var(--text3); }
+  .profile-name { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .profile-bio { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }
+  .profile-location-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); margin-bottom: 14px; }
+  .profile-location-tag svg { width: 11px; height: 11px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; }
+  .profile-actions { display: flex; gap: 8px; }
+  .profile-edit-btn { flex: 1; background: var(--surface); border: 0.5px solid var(--border2); border-radius: 10px; padding: 8px 0; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .profile-edit-btn:active { background: var(--surface2); }
+  .profile-share-btn { background: var(--surface); border: 0.5px solid var(--border2); border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 6px; transition: background 0.15s; }
+  .profile-share-btn:active { background: var(--surface2); }
+  .profile-share-btn svg { width: 14px; height: 14px; stroke: var(--text); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .profile-tabs { display: flex; border-bottom: 0.5px solid var(--border); flex-shrink: 0; background: var(--bg); }
+  .profile-tab { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px 0; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; transition: border-color 0.15s; }
+  .profile-tab svg { width: 18px; height: 18px; stroke: var(--text3); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.15s; }
+  .profile-tab.active svg { stroke: var(--text); }
+  .profile-tab.active { border-bottom-color: var(--text); }
+  .profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; }
+  .profile-thumb { aspect-ratio: 1; cursor: pointer; transition: opacity 0.15s; overflow: hidden; }
+  .profile-thumb:active { opacity: 0.8; }
+  .profile-thumb-inner { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .profile-thumb-inner svg { opacity: 0.3; }
+  .empty-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 20px; gap: 10px; }
+  .empty-tab svg { width: 36px; height: 36px; stroke: var(--text3); fill: none; stroke-width: 1; stroke-linecap: round; }
+  .empty-tab-text { font-size: 13px; color: var(--text3); text-align: center; line-height: 1.5; }
+
+  .img-warm { background: #EDE4DA; } .img-green { background: #DCE8D8; } .img-blue { background: #D8E2EE; }
+  .img-pink { background: #EDD8E2; } .img-clay { background: #E8D8CC; } .img-sage { background: #D6E2D6; }
+</style>
+</head>
+<body>
+<div class="device-wrap">
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="screen">
+
+      <!-- FEED -->
+      <div class="view active" id="view-feed">
+        <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><span>●●● ▌</span></div></div>
+        <div class="top-bar">
+          <span class="app-wordmark">forkyou<span class="wordmark-dot">.</span></span>
+          <button class="icon-btn"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+        </div>
+        <div class="tabs">
+          <div class="tab active" onclick="switchFeedTab(this)">Following</div>
+          <div class="tab" onclick="switchFeedTab(this)">Discover</div>
+        </div>
+        <div class="view-content"><div class="feed-grid" id="feed-grid"></div></div>
+        <div class="bottom-nav">
+          <button class="nav-item active" onclick="showView('feed',this)"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="nav-label">Feed</span></button>
+          <button class="nav-item" onclick="showView('search',this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="nav-label">Search</span></button>
+          <button class="nav-item" style="flex:none" onclick="showView('create',null)"><div class="post-fab"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div></button>
+          <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="nav-label">Alerts</span></button>
+          <button class="nav-item" onclick="showView('profile',this)"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-label">Profile</span></button>
+        </div>
+      </div>
+
+      <!-- POST VIEW -->
+      <div class="view" id="view-post">
+        <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><span>●●● ▌</span></div></div>
+        <div class="back-bar">
+          <button class="back-btn" id="post-back-btn"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
+          <button class="icon-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg></button>
+        </div>
+        <div class="view-content" id="post-scroll">
+          <div class="post-photo" id="post-photo"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#B4B2A9" stroke-width="0.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><div class="photo-dots"><div class="pdot active"></div><div class="pdot"></div><div class="pdot"></div></div></div>
+          <div class="actions-bar">
+            <div class="actions-left">
+              <button class="action-btn" id="like-btn" onclick="toggleLike()"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="action-count">2.4k</span></button>
+              <button class="action-btn"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="action-count">84</span></button>
+              <button class="action-btn" id="save-btn" onclick="toggleSave()"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+              <button class="action-btn"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
+            </div>
+            <button class="follow-pill" id="follow-btn" onclick="toggleFollow()">Follow</button>
+          </div>
+          <div class="post-content" id="post-content-area"></div>
+          <div class="comments-section">
+            <div class="comments-heading">Comments (84)</div>
+            <div class="comment"><div class="avatar-xs" style="background:#FBEAF0;color:#993556;">MF</div><div><div class="comment-handle">@melfoods</div><div class="comment-text">Went here last week, the broth is absolutely insane. Add extra chashu!</div></div></div>
+            <div class="comment"><div class="avatar-xs" style="background:#E1F5EE;color:#0F6E56;">JK</div><div><div class="comment-handle">@jkitchen</div><div class="comment-text">Been wanting to try this for ages, going this weekend!</div></div></div>
+            <div class="comment"><div class="avatar-xs" style="background:#E6F1FB;color:#185FA5;">TR</div><div><div class="comment-handle">@tomreview</div><div class="comment-text">The spicy variant is even better if you can handle the heat</div></div></div>
+          </div>
+        </div>
+        <div class="comment-input-bar">
+          <div class="avatar-xs" style="background:#FAEEDA;color:#854F0B;width:28px;height:28px;font-size:9px;">ME</div>
+          <input class="comment-field" placeholder="Add a comment…" />
+          <button class="send-btn"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        </div>
+      </div>
+
+      <!-- SEARCH -->
+      <div class="view" id="view-search">
+        <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><span>●●● ▌</span></div></div>
+        <div class="top-bar"><span class="app-wordmark">forkyou<span class="wordmark-dot">.</span></span></div>
+        <div class="search-top">
+          <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-field" id="search-field" placeholder="Search dishes, places, vibes…" oninput="handleSearch(this.value)" />
+            <button class="clear-btn" id="clear-btn" onclick="clearSearch()"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="category-chips" id="category-chips">
+            <div class="chip active" onclick="selectChip(this,'ramen')"><span>🍜</span> Ramen</div>
+            <div class="chip" onclick="selectChip(this,'brunch')"><span>☀️</span> Brunch</div>
+            <div class="chip" onclick="selectChip(this,'dumplings')"><span>🥟</span> Dumplings</div>
+            <div class="chip" onclick="selectChip(this,'date night')"><span>🌙</span> Date night</div>
+            <div class="chip" onclick="selectChip(this,'cheap')"><span>💸</span> Cheap eats</div>
+            <div class="chip" onclick="selectChip(this,'japanese')"><span>🍣</span> Japanese</div>
+            <div class="chip" onclick="selectChip(this,'burger')"><span>🍔</span> Burgers</div>
+          </div>
+        </div>
+        <div class="view-content">
+          <div id="search-default">
+            <div class="search-section-label">Trending now</div>
+            <div class="trending-list">
+              <div class="trending-item" onclick="searchFor('#ramen')"><span class="trending-rank hot">1</span><span class="trending-tag">#ramen</span><span class="trending-count">4.2k posts</span></div>
+              <div class="trending-item" onclick="searchFor('#sydneybrunch')"><span class="trending-rank hot">2</span><span class="trending-tag">#sydneybrunch</span><span class="trending-count">3.8k posts</span></div>
+              <div class="trending-item" onclick="searchFor('#hiddengem')"><span class="trending-rank hot">3</span><span class="trending-tag">#hiddengem</span><span class="trending-count">2.9k posts</span></div>
+              <div class="trending-item" onclick="searchFor('#melbournefood')"><span class="trending-rank">4</span><span class="trending-tag">#melbournefood</span><span class="trending-count">2.1k posts</span></div>
+              <div class="trending-item" onclick="searchFor('#dumplings')"><span class="trending-rank">5</span><span class="trending-tag">#dumplings</span><span class="trending-count">1.7k posts</span></div>
+              <div class="trending-item" onclick="searchFor('#datenight')"><span class="trending-rank">6</span><span class="trending-tag">#datenight</span><span class="trending-count">1.4k posts</span></div>
+            </div>
+          </div>
+          <div id="search-results-area" style="display:none">
+            <div class="results-label" id="results-label"></div>
+            <div class="feed-grid" id="search-results-grid"></div>
+            <div class="no-results" id="no-results" style="display:none">No posts found</div>
+          </div>
+        </div>
+        <div class="bottom-nav">
+          <button class="nav-item" onclick="showView('feed',this)"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="nav-label">Feed</span></button>
+          <button class="nav-item active" onclick="showView('search',this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="nav-label">Search</span></button>
+          <button class="nav-item" style="flex:none" onclick="showView('create',null)"><div class="post-fab"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div></button>
+          <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="nav-label">Alerts</span></button>
+          <button class="nav-item" onclick="showView('profile',this)"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-label">Profile</span></button>
+        </div>
+      </div>
+
+      <!-- CREATE -->
+      <div class="view" id="view-create">
+        <div class="status-bar"><span class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><span>●●● ▌</span></div></div>
+        <div class="create-top">
+          <button class="back-btn" onclick="showView('feed',null)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>Cancel</button>
+          <span class="create-title">New review</span>
+          <button class="post-btn" id="post-submit-btn" disabled onclick="submitPost()">Post</button>
+        </div>
+        <div class="create-scroll">
+          <div id="photo-upload-area" class="photo-upload-area" onclick="addPhoto()">
+            <div class="upload-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            <span class="upload-label">Add photos or video</span>
+            <span class="upload-sublabel">Tap to select from library</span>
+          </div>
+          <div class="photo-preview-strip" id="photo-strip" style="display:none"></div>
+          <div class="create-section">
+            <textarea class="title-input" id="title-input" placeholder="Give your review a title…" rows="2" maxlength="100" oninput="updateCharCount();checkPostReady()"></textarea>
+            <div class="char-count"><span id="title-chars">0</span>/100</div>
+          </div>
+          <div class="divider"></div>
+          <div class="create-section">
+            <textarea class="body-input" id="body-input" placeholder="Share your experience — what did you order, what was the vibe, would you go back?" rows="4" oninput="checkPostReady()"></textarea>
+          </div>
+          <div class="divider"></div>
+          <div class="create-ratings">
+            <div class="create-rating-chip">
+              <span class="create-rating-label">Food</span>
+              <div class="tap-stars" id="food-stars">
+                <span class="tap-star" onclick="setRating('food',1)">★</span><span class="tap-star" onclick="setRating('food',2)">★</span><span class="tap-star" onclick="setRating('food',3)">★</span><span class="tap-star" onclick="setRating('food',4)">★</span><span class="tap-star" onclick="setRating('food',5)">★</span>
+              </div>
+            </div>
+            <div class="create-rating-chip">
+              <span class="create-rating-label">Vibe</span>
+              <div class="tap-stars" id="vibe-stars">
+                <span class="tap-star" onclick="setRating('vibe',1)">★</span><span class="tap-star" onclick="setRating('vibe',2)">★</span><span class="tap-star" onclick="setRating('vibe',3)">★</span><span class="tap-star" onclick="setRating('vibe',4)">★</span><span class="tap-star" onclick="setRating('vibe',5)">★</span>
+              </div>
+            </div>
+            <div class="create-rating-chip">
+              <span class="create-rating-label">Cost</span>
+              <div class="tap-dollars" id="cost-dollars">
+                <span class="tap-dollar" onclick="setRating('cost',1)">$</span><span class="tap-dollar" onclick="setRating('cost',2)">$</span><span class="tap-dollar" onclick="setRating('cost',3)">$</span><span class="tap-dollar" onclick="setRating('cost',4)">$</span>
+              </div>
+            </div>
+          </div>
+          <div class="location-input-wrap" id="location-wrap" onclick="openLocationModal()">
+            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span id="location-text">Add location (optional)</span>
+          </div>
+          <div class="hashtag-input-wrap" id="hashtag-wrap">
+            <div id="hashtag-tokens"></div>
+            <input class="hashtag-field" id="hashtag-field" placeholder="Add hashtags…" onkeydown="handleHashtagKey(event)" />
+          </div>
+          <div class="hashtag-hint">Press space or enter to add a tag</div>
+          <div style="height:20px;"></div>
+        </div>
+        <div class="modal-backdrop" id="modal-backdrop" onclick="closeLocationModal()"></div>
+        <div class="location-modal" id="location-modal">
+          <div class="modal-handle"></div>
+          <div class="modal-title">Tag a restaurant</div>
+          <div class="modal-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="Search restaurants…" oninput="filterLocations(this.value)" id="location-search-field" /></div>
+          <div class="location-results" id="location-results"></div>
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="view" id="view-profile">
+        <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><span>●●● ▌</span></div></div>
+        <div class="profile-top-bar">
+          <span class="profile-username">@sarahleats</span>
+          <div class="profile-top-actions">
+            <button class="icon-btn" title="Settings">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="view-content" id="profile-scroll">
+          <div class="profile-header">
+            <div class="profile-avatar-row">
+              <div class="profile-avatar" style="background:#E6F1FB;color:#185FA5;">SL</div>
+              <div class="profile-stats">
+                <div class="profile-stat">
+                  <span class="profile-stat-num" id="profile-post-count">24</span>
+                  <span class="profile-stat-label">Posts</span>
+                </div>
+                <div class="profile-stat">
+                  <span class="profile-stat-num">1.4k</span>
+                  <span class="profile-stat-label">Followers</span>
+                </div>
+                <div class="profile-stat">
+                  <span class="profile-stat-num">312</span>
+                  <span class="profile-stat-label">Following</span>
+                </div>
+              </div>
+            </div>
+            <div class="profile-name">Sarah Lee</div>
+            <div class="profile-bio">Sydney-based food lover hunting hidden gems and honest eats. No sponsored content, ever.</div>
+            <div class="profile-location-tag">
+              <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Sydney, NSW
+            </div>
+            <div class="profile-actions">
+              <button class="profile-edit-btn">Edit profile</button>
+              <button class="profile-share-btn">
+                <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Share
+              </button>
+            </div>
+          </div>
+          <div class="profile-tabs" id="profile-tabs">
+            <div class="profile-tab active" onclick="switchProfileTab(this,'posts')">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </div>
+            <div class="profile-tab" onclick="switchProfileTab(this,'saved')">
+              <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="profile-tab" onclick="switchProfileTab(this,'liked')">
+              <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </div>
+          </div>
+          <div id="profile-tab-content"></div>
+        </div>
+        <div class="bottom-nav">
+          <button class="nav-item" onclick="showView('feed',this)"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span class="nav-label">Feed</span></button>
+          <button class="nav-item" onclick="showView('search',this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="nav-label">Search</span></button>
+          <button class="nav-item" style="flex:none" onclick="showView('create',null)"><div class="post-fab"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div></button>
+          <button class="nav-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="nav-label">Alerts</span></button>
+          <button class="nav-item active" onclick="showView('profile',this)"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-label">Profile</span></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="device-label">interactive prototype · tap to navigate</div>
+</div>
+
+<script>
+const posts = [
+  { id:1, title:"Best tonkotsu ramen in Sydney — thick broth, melt-in-mouth chashu", creator:"sarahleats", initials:"SL", avatarBg:"#E6F1FB", avatarColor:"#185FA5", likes:"2.4k", imgClass:"img-warm", tall:false, tags:["ramen","sydneyfood","japanesefood","surryhills"], body:"The broth here is next level — you can tell it's been simmered for hours. Chashu is tender, soft boiled egg is perfectly jammy. Portions are generous and the vibe is low-key and unpretentious.", location:"Gaku Robata, Surry Hills", food:5, vibe:4, cost:3 },
+  { id:2, title:"Hidden gem dumpling spot in Haymarket — $12 for 20 pieces", creator:"melfoods", initials:"MF", avatarBg:"#FBEAF0", avatarColor:"#993556", likes:"891", imgClass:"img-green", tall:true, tags:["dumplings","haymarket","sydneyfood","cheapeat"], body:"Tucked away on a side street most people walk past. Hand-folded dumplings, pork and chive is the move. The chilli oil is dangerously good.", location:"Lucky House, Haymarket", food:5, vibe:3, cost:1 },
+  { id:3, title:"Date night done right — Surry Hills Italian that won't break the bank", creator:"jkitchen", initials:"JK", avatarBg:"#E1F5EE", avatarColor:"#0F6E56", likes:"1.1k", imgClass:"img-clay", tall:true, tags:["datenight","italian","surryhills","sydneyfood"], body:"Perfect for impressing someone without spending $200 each. The pasta is made fresh daily. Get the cacio e pepe and thank me later.", location:"Pasta Emilia, Surry Hills", food:4, vibe:5, cost:3 },
+  { id:4, title:"Smash burger that actually slaps — Newtown's best kept secret", creator:"tomreview", initials:"TR", avatarBg:"#FAEEDA", avatarColor:"#854F0B", likes:"3.2k", imgClass:"img-blue", tall:false, tags:["burger","newtown","sydneyfood","hiddengem"], body:"Double smash, american cheese, pickles, special sauce on a brioche bun. Simple done perfectly.", location:"Patty Smith, Newtown", food:5, vibe:4, cost:2 },
+  { id:5, title:"Melbourne's best omakase for under $100 — book months ahead", creator:"foodwithfinn", initials:"FF", avatarBg:"#F1EEFE", avatarColor:"#534AB7", likes:"5.7k", imgClass:"img-pink", tall:false, tags:["omakase","japanese","melbournefood","sushi"], body:"12 courses of absolute precision. Chef sources fish directly from Tsukiji twice a week.", location:"Sushi Den, Melbourne CBD", food:5, vibe:5, cost:4 },
+  { id:6, title:"Sydney brunch spot with zero wait — and the eggs benny are elite", creator:"sarahleats", initials:"SL", avatarBg:"#E6F1FB", avatarColor:"#185FA5", likes:"2.1k", imgClass:"img-sage", tall:true, tags:["brunch","sydneybrunch","eggs","redfern"], body:"Most brunch spots in Surry Hills have 45-min waits. This one somehow doesn't and the food is better than most.", location:"Brunch Club, Redfern", food:4, vibe:4, cost:2 },
+];
+
+const myPosts = posts.filter(p => p.creator === 'sarahleats');
+const savedPosts = [posts[1], posts[3]];
+const likedPosts = [posts[2], posts[4], posts[3]];
+
+const restaurants = [
+  { name:"Gaku Robata", suburb:"Surry Hills, NSW" },{ name:"Lucky House Dumplings", suburb:"Haymarket, NSW" },
+  { name:"Pasta Emilia", suburb:"Surry Hills, NSW" },{ name:"Patty Smith Burgers", suburb:"Newtown, NSW" },
+  { name:"Sushi Den", suburb:"Melbourne CBD, VIC" },{ name:"Brunch Club", suburb:"Redfern, NSW" },
+  { name:"Chin Chin", suburb:"Sydney CBD, NSW" },{ name:"Hubert", suburb:"Sydney CBD, NSW" },
+  { name:"Lune Croissanterie", suburb:"Fitzroy, VIC" },{ name:"Tipo 00", suburb:"Melbourne CBD, VIC" },
+];
+
+const ratings = { food:0, vibe:0, cost:0 };
+const hashtags = [];
+let photos = 0;
+let selectedLocation = '';
+let postOpenedFrom = 'feed';
+let currentProfileTab = 'posts';
+
+function starHTML(n) { let s=''; for(let i=1;i<=5;i++) s+=`<span class="star${i<=n?' on':''}">★</span>`; return s; }
+function dollarHTML(n) { let s=''; for(let i=1;i<=4;i++) s+=`<span class="dollar${i<=n?' on':''}">$</span>`; return s; }
+
+function cardHTML(post) {
+  const h = post.tall ? 'aspect-ratio:3/5' : 'aspect-ratio:3/4';
+  return `<div class="post-card" onclick="openPost(${post.id})">
+    <div class="post-img ${post.imgClass}" style="${h};min-height:100px;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B4B2A9" stroke-width="0.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+    <div class="post-info">
+      <div class="post-title-sm">${post.title}</div>
+      <div class="post-meta">
+        <div class="creator-row-sm"><div class="avatar-sm" style="background:${post.avatarBg};color:${post.avatarColor};">${post.initials}</div><span class="creator-name-sm">@${post.creator}</span></div>
+        <div class="like-count"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>${post.likes}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function profileThumbHTML(post) {
+  return `<div class="profile-thumb" onclick="openPost(${post.id})"><div class="profile-thumb-inner ${post.imgClass}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B4B2A9" stroke-width="0.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div></div>`;
+}
+
+document.getElementById('feed-grid').innerHTML = posts.map(cardHTML).join('');
+renderProfileTab('posts');
+
+function renderProfileTab(tab) {
+  const el = document.getElementById('profile-tab-content');
+  if(tab === 'posts') {
+    const allMyPosts = posts.filter(p => p.creator === 'sarahleats');
+    if(allMyPosts.length === 0) {
+      el.innerHTML = `<div class="empty-tab"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><div class="empty-tab-text">No posts yet.<br>Share your first food experience.</div></div>`;
+    } else {
+      el.innerHTML = `<div class="profile-grid">${allMyPosts.map(profileThumbHTML).join('')}</div>`;
+    }
+    document.getElementById('profile-post-count').textContent = allMyPosts.length;
+  } else if(tab === 'saved') {
+    if(savedPosts.length === 0) {
+      el.innerHTML = `<div class="empty-tab"><svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><div class="empty-tab-text">No saved posts yet.<br>Bookmark reviews to find them here.</div></div>`;
+    } else {
+      el.innerHTML = `<div class="profile-grid">${savedPosts.map(profileThumbHTML).join('')}</div>`;
+    }
+  } else if(tab === 'liked') {
+    if(likedPosts.length === 0) {
+      el.innerHTML = `<div class="empty-tab"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><div class="empty-tab-text">No liked posts yet.<br>Heart reviews you love.</div></div>`;
+    } else {
+      el.innerHTML = `<div class="profile-grid">${likedPosts.map(profileThumbHTML).join('')}</div>`;
+    }
+  }
+}
+
+function switchProfileTab(el, tab) {
+  document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentProfileTab = tab;
+  renderProfileTab(tab);
+}
+
+function openPost(id) {
+  const p = posts.find(x=>x.id===id); if(!p) return;
+  postOpenedFrom = document.querySelector('.view.active').id.replace('view-','');
+  document.getElementById('post-back-btn').onclick = () => showView(postOpenedFrom, null);
+  document.getElementById('post-photo').className = `post-photo ${p.imgClass}`;
+  document.getElementById('post-content-area').innerHTML = `
+    <div class="creator-row">
+      <div class="avatar-md" style="background:${p.avatarBg};color:${p.avatarColor};">${p.initials}</div>
+      <div><div class="creator-handle">@${p.creator}</div><div class="post-timestamp">2 days ago</div></div>
+    </div>
+    <div class="post-title-full">${p.title}</div>
+    <div class="post-body-text">${p.body}</div>
+    <div class="ratings-row">
+      <div class="rating-chip"><span class="rating-label">Food</span><div class="stars">${starHTML(p.food)}</div></div>
+      <div class="rating-chip"><span class="rating-label">Vibe</span><div class="stars">${starHTML(p.vibe)}</div></div>
+      <div class="rating-chip"><span class="rating-label">Cost</span><div class="stars">${dollarHTML(p.cost)}</div></div>
+    </div>
+    <div class="location-pill"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${p.location}</div>
+    <div class="hashtags">${p.tags.map(t=>`<span class="hashtag">#${t}</span>`).join('')}</div>`;
+  document.getElementById('like-btn').classList.remove('liked');
+  document.getElementById('save-btn').classList.remove('saved');
+  document.getElementById('follow-btn').classList.remove('following');
+  document.getElementById('follow-btn').textContent = 'Follow';
+  document.getElementById('post-scroll').scrollTop = 0;
+  showView('post', null);
+}
+
+function showView(name, navEl) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(navEl) {
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    navEl.classList.add('active');
+  }
+  if(name === 'profile') {
+    renderProfileTab(currentProfileTab);
+    document.getElementById('profile-scroll').scrollTop = 0;
+  }
+}
+
+function switchFeedTab(el) {
+  document.querySelectorAll('#view-feed .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleLike() { document.getElementById('like-btn').classList.toggle('liked'); }
+function toggleSave() { document.getElementById('save-btn').classList.toggle('saved'); }
+function toggleFollow() {
+  const btn=document.getElementById('follow-btn');
+  btn.classList.toggle('following');
+  btn.textContent = btn.classList.contains('following') ? 'Following' : 'Follow';
+}
+
+function selectChip(el, query) {
+  document.querySelectorAll('#category-chips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('search-field').value = query;
+  handleSearch(query);
+  document.getElementById('clear-btn').classList.add('visible');
+}
+
+function searchFor(tag) {
+  document.getElementById('search-field').value = tag;
+  handleSearch(tag);
+  document.getElementById('clear-btn').classList.add('visible');
+}
+
+function handleSearch(val) {
+  document.getElementById('clear-btn').classList.toggle('visible', val.length > 0);
+  if(!val.trim()) {
+    document.getElementById('search-default').style.display = '';
+    document.getElementById('search-results-area').style.display = 'none'; return;
+  }
+  document.getElementById('search-default').style.display = 'none';
+  document.getElementById('search-results-area').style.display = '';
+  const q = val.toLowerCase().replace('#','');
+  const results = posts.filter(p => p.title.toLowerCase().includes(q) || p.tags.some(t=>t.includes(q)) || p.creator.toLowerCase().includes(q) || p.location.toLowerCase().includes(q) || p.body.toLowerCase().includes(q));
+  const grid = document.getElementById('search-results-grid');
+  const noRes = document.getElementById('no-results');
+  document.getElementById('results-label').textContent = results.length ? `${results.length} post${results.length!==1?'s':''} for "${val}"` : '';
+  if(results.length === 0) { grid.innerHTML = ''; noRes.style.display = ''; }
+  else { noRes.style.display = 'none'; grid.innerHTML = results.map(cardHTML).join(''); }
+}
+
+function clearSearch() {
+  document.getElementById('search-field').value = '';
+  handleSearch('');
+  document.querySelectorAll('#category-chips .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+}
+
+function setRating(cat, val) {
+  ratings[cat] = val;
+  if(cat==='cost') document.querySelectorAll('#cost-dollars .tap-dollar').forEach((d,i)=>d.classList.toggle('on',i<val));
+  else document.querySelectorAll(`#${cat}-stars .tap-star`).forEach((s,i)=>s.classList.toggle('on',i<val));
+}
+
+function updateCharCount() {
+  document.getElementById('title-chars').textContent = document.getElementById('title-input').value.length;
+}
+
+function checkPostReady() {
+  document.getElementById('post-submit-btn').disabled = document.getElementById('title-input').value.trim().length < 3;
+}
+
+function addPhoto() {
+  if(photos >= 9) return;
+  photos++;
+  const strip = document.getElementById('photo-strip');
+  document.getElementById('photo-upload-area').style.display = 'none';
+  strip.style.display = 'flex';
+  const colors = ['#EDE4DA','#DCE8D8','#D8E2EE','#EDD8E2','#E8D8CC','#D6E2D6'];
+  const thumb = document.createElement('div');
+  thumb.className = 'preview-thumb';
+  thumb.style.background = colors[photos % colors.length];
+  thumb.innerHTML = `<div class="thumb-remove" onclick="removePhoto(this.parentElement)"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>`;
+  const addMore = strip.querySelector('.add-more');
+  if(addMore) strip.insertBefore(thumb, addMore);
+  else {
+    strip.appendChild(thumb);
+    if(photos < 9) {
+      const add = document.createElement('div');
+      add.className = 'preview-thumb add-more';
+      add.onclick = addPhoto;
+      add.innerHTML = `<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+      strip.appendChild(add);
+    }
+  }
+}
+
+function removePhoto(thumb) {
+  thumb.remove(); photos--;
+  if(photos === 0) {
+    document.getElementById('photo-strip').style.display = 'none';
+    document.getElementById('photo-upload-area').style.display = '';
+    document.getElementById('photo-strip').innerHTML = '';
+  }
+}
+
+function handleHashtagKey(e) {
+  const field = document.getElementById('hashtag-field');
+  if((e.key===' '||e.key==='Enter') && field.value.trim()) {
+    e.preventDefault();
+    let tag = field.value.trim().replace(/^#/,'').replace(/\s/g,'');
+    if(tag && !hashtags.includes(tag) && hashtags.length < 10) {
+      hashtags.push(tag);
+      const tok = document.createElement('div');
+      tok.className = 'hashtag-token';
+      tok.innerHTML = `#${tag} <span style="opacity:0.7;cursor:pointer" onclick="removeHashtag('${tag}',this.parentElement)">×</span>`;
+      document.getElementById('hashtag-tokens').appendChild(tok);
+    }
+    field.value = '';
+  }
+}
+
+function removeHashtag(tag, el) {
+  const i = hashtags.indexOf(tag); if(i>-1) hashtags.splice(i,1); el.remove();
+}
+
+function openLocationModal() {
+  document.getElementById('location-modal').classList.add('open');
+  document.getElementById('modal-backdrop').classList.add('open');
+  filterLocations('');
+  setTimeout(() => document.getElementById('location-search-field').focus(), 100);
+}
+
+function closeLocationModal() {
+  document.getElementById('location-modal').classList.remove('open');
+  document.getElementById('modal-backdrop').classList.remove('open');
+}
+
+function filterLocations(val) {
+  const q = val.toLowerCase();
+  const filtered = val ? restaurants.filter(r=>r.name.toLowerCase().includes(q)||r.suburb.toLowerCase().includes(q)) : restaurants;
+  document.getElementById('location-results').innerHTML = filtered.map(r=>`
+    <div class="location-result" onclick="selectLocation('${r.name}','${r.suburb}')">
+      <div class="location-result-name">${r.name}</div>
+      <div class="location-result-suburb">${r.suburb}</div>
+    </div>`).join('');
+}
+
+function selectLocation(name, suburb) {
+  selectedLocation = `${name}, ${suburb.split(',')[0]}`;
+  const wrap = document.getElementById('location-wrap');
+  wrap.classList.add('filled');
+  wrap.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:var(--accent);fill:none;stroke-width:1.5;stroke-linecap:round;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span style="color:var(--text2);font-size:13px;flex:1;">${selectedLocation}</span><span class="location-clear" onclick="clearLocation(event)">✕</span>`;
+  closeLocationModal();
+}
+
+function clearLocation(e) {
+  e && e.stopPropagation();
+  selectedLocation = '';
+  const wrap = document.getElementById('location-wrap');
+  wrap.classList.remove('filled');
+  wrap.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:var(--text3);fill:none;stroke-width:1.5;stroke-linecap:round;flex-shrink:0;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Add location (optional)</span>`;
+  wrap.onclick = openLocationModal;
+}
+
+function submitPost() {
+  const title = document.getElementById('title-input').value.trim();
+  const body = document.getElementById('body-input').value.trim();
+  const imgClasses = ['img-warm','img-green','img-blue','img-pink','img-clay','img-sage'];
+  const newPost = {
+    id: Date.now(), title, body: body||'', creator:"sarahleats", initials:"SL",
+    avatarBg:"#E6F1FB", avatarColor:"#185FA5", likes:"0",
+    imgClass: imgClasses[Math.floor(Math.random()*6)], tall: Math.random()>0.5,
+    tags: [...hashtags], location: selectedLocation||'Unknown location',
+    food: ratings.food||3, vibe: ratings.vibe||3, cost: ratings.cost||2
+  };
+  posts.unshift(newPost);
+  document.getElementById('feed-grid').innerHTML = posts.map(cardHTML).join('');
+  document.getElementById('title-input').value = '';
+  document.getElementById('body-input').value = '';
+  document.getElementById('hashtag-tokens').innerHTML = '';
+  document.getElementById('hashtag-field').value = '';
+  hashtags.length = 0; photos = 0;
+  ratings.food = 0; ratings.vibe = 0; ratings.cost = 0;
+  ['food-stars','vibe-stars'].forEach(id => document.querySelectorAll(`#${id} .tap-star`).forEach(s=>s.classList.remove('on')));
+  document.querySelectorAll('#cost-dollars .tap-dollar').forEach(d=>d.classList.remove('on'));
+  document.getElementById('photo-strip').style.display = 'none';
+  document.getElementById('photo-strip').innerHTML = '';
+  document.getElementById('photo-upload-area').style.display = '';
+  clearLocation(null);
+  document.getElementById('post-submit-btn').disabled = true;
+  document.getElementById('title-chars').textContent = '0';
+  showView('profile', null);
+  renderProfileTab('posts');
+}
+</script>
+</body>
+</html>
