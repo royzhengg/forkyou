@@ -1,15 +1,23 @@
+import React, { useState, useMemo } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, useWindowDimensions,
+  View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useState, useMemo } from 'react'
 import { useRouter } from 'expo-router'
-import { Svg, Circle, Line, Path } from 'react-native-svg'
 import { imgColors } from '@/constants/Colors'
 import { useThemeColors } from '@/lib/ThemeContext'
-import { usePosts } from '@/lib/PostsContext'
+import { useAuth } from '@/lib/AuthContext'
+import { useAuthGate } from '@/lib/AuthGateContext'
+import { MOCK_USERS, RESTAURANTS, MY_CREATOR } from '@/lib/data'
+import { useSearch, type PersonResult, type PlaceResult } from '@/lib/hooks/useSearch'
+import { useUserLocation } from '@/lib/hooks/useUserLocation'
+import { formatKm } from '@/lib/utils/geo'
+import { SearchIcon, CloseIcon, PinIcon, ImagePlaceholder } from '@/components/icons'
+import { PostRatingStrip } from '@/components/RatingDisplay'
+import { Avatar } from '@/components/Avatar'
 import type { Post } from '@/lib/data'
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const CHIPS = [
   { label: 'Ramen', emoji: '🍜', query: 'ramen' },
@@ -30,98 +38,189 @@ const TRENDING = [
   { tag: '#datenight', count: '1.4k posts' },
 ]
 
-function SearchIcon() {
+// ─── Reusable row components ──────────────────────────────────────────────────
+
+const PersonRow = React.memo(function PersonRow({ person }: { person: PersonResult }) {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { requireAuth } = useAuthGate()
   const colors = useThemeColors()
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.text3} strokeWidth={1.5} strokeLinecap="round">
-      <Circle cx={11} cy={11} r={8} />
-      <Line x1={21} y1={21} x2={16.65} y2={16.65} />
-    </Svg>
-  )
-}
+  const styles = useMemo(() => makeStyles(colors), [colors])
+  const [following, setFollowing] = useState(false)
 
-function CloseIcon() {
-  const colors = useThemeColors()
-  return (
-    <Svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={colors.text2} strokeWidth={2} strokeLinecap="round">
-      <Line x1={18} y1={6} x2={6} y2={18} />
-      <Line x1={6} y1={6} x2={18} y2={18} />
-    </Svg>
-  )
-}
+  function handleFollow() {
+    if (!user) { requireAuth(); return }
+    setFollowing(f => !f)
+  }
 
-function ImagePlaceholder() {
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#B4B2A9" strokeWidth={0.8} strokeLinecap="round">
-      <Path d="M3 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-      <Circle cx={8.5} cy={8.5} r={1.5} />
-      <Path d="M21 15l-5-5L5 21" />
-    </Svg>
+    <TouchableOpacity
+      style={styles.personRow}
+      onPress={() => router.push({ pathname: '/user/[username]', params: { username: person.username } })}
+      activeOpacity={0.7}
+    >
+      <Avatar initials={person.initials} bg={person.avatarBg} color={person.avatarColor} size={40} />
+      <View style={styles.personInfo}>
+        <Text style={styles.personUsername}>@{person.username}</Text>
+        <Text style={styles.personName} numberOfLines={1}>{person.displayName}</Text>
+      </View>
+      {person.followers !== '—' && (
+        <Text style={styles.personFollowers}>{person.followers} followers</Text>
+      )}
+      <TouchableOpacity
+        style={[styles.followPill, following && styles.followPillActive]}
+        onPress={handleFollow}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Text style={[styles.followPillText, following && styles.followPillTextActive]}>
+          {following ? 'Following' : 'Follow'}
+        </Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
   )
-}
+})
 
-function HeartIcon() {
-  const colors = useThemeColors()
-  return (
-    <Svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke={colors.text3} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </Svg>
-  )
-}
-
-function PostCard({ post, colWidth }: { post: Post; colWidth: number }) {
+const PostCompactRow = React.memo(function PostCompactRow({ post }: { post: Post }) {
   const router = useRouter()
   const colors = useThemeColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
-  const imgH = post.tall ? colWidth * (5 / 3) : colWidth * (4 / 3)
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => router.push(`/post/${post.id}`)}>
-      <View style={[styles.cardImg, { height: imgH, backgroundColor: imgColors[post.imgKey] }]}>
-        <ImagePlaceholder />
+    <TouchableOpacity
+      style={styles.postRow}
+      onPress={() => router.push(`/post/${post.id}`)}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.postThumb, { backgroundColor: imgColors[post.imgKey] }]}>
+        {post.imageUrl
+          ? <Image source={{ uri: post.imageUrl }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+          : <ImagePlaceholder size={18} />
+        }
       </View>
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={2}>{post.title}</Text>
-        <View style={styles.cardMeta}>
-          <View style={styles.creatorRow}>
-            <View style={[styles.avatarSm, { backgroundColor: post.avatarBg }]}>
-              <Text style={[styles.avatarSmText, { color: post.avatarColor }]}>{post.initials}</Text>
-            </View>
-            <Text style={styles.creatorName}>@{post.creator}</Text>
-          </View>
-          <View style={styles.likeCount}>
-            <HeartIcon />
-            <Text style={styles.likeText}>{post.likes}</Text>
-          </View>
+      <View style={styles.postRowContent}>
+        <View style={styles.postRowTop}>
+          <Text style={styles.postRowCreator}>@{post.creator}</Text>
+          <Text style={styles.postRowLikes}>♡ {post.likes}</Text>
         </View>
+        <Text style={styles.postRowTitle} numberOfLines={2}>{post.title}</Text>
+        <PostRatingStrip food={post.food} vibe={post.vibe} cost={post.cost} />
       </View>
     </TouchableOpacity>
   )
+})
+
+const PlaceRow = React.memo(function PlaceRow({ place, distanceKm }: { place: PlaceResult; distanceKm?: number }) {
+  const router = useRouter()
+  const colors = useThemeColors()
+  const styles = useMemo(() => makeStyles(colors), [colors])
+  const meta = [place.city, place.cuisine_type].filter(Boolean).join(' · ')
+  return (
+    <TouchableOpacity
+      style={styles.placeRow}
+      onPress={() => router.push({
+        pathname: '/location/[placeId]',
+        params: {
+          placeId: place.google_place_id ?? 'none',
+          name: place.name,
+          address: place.address ?? '',
+          lat: String(place.latitude ?? ''),
+          lng: String(place.longitude ?? ''),
+        },
+      })}
+      activeOpacity={0.8}
+    >
+      <View style={styles.placeIconWrap}>
+        <PinIcon size={12} />
+      </View>
+      <View style={styles.placeInfo}>
+        <Text style={styles.placeName}>{place.name}</Text>
+        {(!!meta || distanceKm != null) && (
+          <Text style={styles.placeMeta} numberOfLines={1}>
+            {[meta, distanceKm != null ? formatKm(distanceKm) : null].filter(Boolean).join(' · ')}
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  )
+})
+
+const PersonChip = React.memo(function PersonChip({ username, u }: { username: string; u: typeof MOCK_USERS[string] }) {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { requireAuth } = useAuthGate()
+  const colors = useThemeColors()
+  const styles = useMemo(() => makeStyles(colors), [colors])
+  const [following, setFollowing] = useState(false)
+
+  function handleFollow() {
+    if (!user) { requireAuth(); return }
+    setFollowing(f => !f)
+  }
+
+  return (
+    <View style={styles.personChip}>
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: '/user/[username]', params: { username } })}
+        activeOpacity={0.8}
+        style={styles.personChipInner}
+      >
+        <Avatar initials={u.initials} bg={u.avatarBg} color={u.avatarColor} size={52} />
+        <Text style={styles.personChipUsername} numberOfLines={1}>@{username}</Text>
+        <Text style={styles.personChipFollowers}>{u.followers}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.followPill, following && styles.followPillActive, { marginTop: 6 }]}
+        onPress={handleFollow}
+      >
+        <Text style={[styles.followPillText, following && styles.followPillTextActive]}>
+          {following ? 'Following' : 'Follow'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+})
+
+function SectionHeader({ title, count }: { title: string; count?: number }) {
+  const colors = useThemeColors()
+  const styles = useMemo(() => makeStyles(colors), [colors])
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
+      {count != null && <Text style={styles.sectionCount}>{count}</Text>}
+    </View>
+  )
 }
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('')
-  const [activeChip, setActiveChip] = useState('ramen')
-  const { posts } = usePosts()
-  const { width } = useWindowDimensions()
-  const colWidth = (width - 16 - 6) / 2
+  const [activeChip, setActiveChip] = useState('')
   const colors = useThemeColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
+  const userLocation = useUserLocation()
 
-  const results = query.trim()
-    ? posts.filter(p => {
-        const q = query.toLowerCase().replace('#', '')
-        return (
-          p.title.toLowerCase().includes(q) ||
-          p.tags.some(t => t.includes(q)) ||
-          p.creator.toLowerCase().includes(q) ||
-          p.location.toLowerCase().includes(q) ||
-          p.body.toLowerCase().includes(q)
-        )
-      })
-    : []
+  const { postResults, peopleResults, placeResults, placeDistances, hasQuery } = useSearch(query, userLocation)
 
-  const leftCol = results.filter((_, i) => i % 2 === 0)
-  const rightCol = results.filter((_, i) => i % 2 === 1)
+  const suggestedPeople = useMemo(
+    () => Object.entries(MOCK_USERS).filter(([u]) => u !== MY_CREATOR),
+    []
+  )
+
+  const popularPlaces = useMemo<PlaceResult[]>(
+    () => RESTAURANTS.slice(0, 5).map(r => ({
+      id: r.name,
+      name: r.name,
+      address: r.address ?? null,
+      city: r.suburb ?? null,
+      cuisine_type: null,
+      google_place_id: r.placeId ?? null,
+      latitude: r.lat ?? null,
+      longitude: r.lng ?? null,
+    })),
+    []
+  )
+
+  const totalResults = postResults.length + peopleResults.length + placeResults.length
 
   function handleChip(chip: typeof CHIPS[number]) {
     setActiveChip(chip.query)
@@ -144,14 +243,14 @@ export default function SearchScreen() {
           <SearchIcon />
           <TextInput
             style={styles.searchField}
-            placeholder="Search dishes, places, vibes…"
+            placeholder="Search dishes, people, places…"
             placeholderTextColor={colors.text3}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={t => { setQuery(t); setActiveChip('') }}
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity style={styles.clearBtn} onPress={() => { setQuery(''); setActiveChip('ramen') }}>
+            <TouchableOpacity style={styles.clearBtn} onPress={() => { setQuery(''); setActiveChip('') }}>
               <CloseIcon />
             </TouchableOpacity>
           )}
@@ -171,9 +270,16 @@ export default function SearchScreen() {
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {!query.trim() ? (
-          <>
-            <Text style={styles.sectionLabel}>TRENDING NOW</Text>
+        {!hasQuery ? (
+          <View style={styles.discoveryPage}>
+            <SectionHeader title="People to follow" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.peopleChipsRow}>
+              {suggestedPeople.map(([username, u]) => (
+                <PersonChip key={username} username={username} u={u} />
+              ))}
+            </ScrollView>
+
+            <SectionHeader title="Trending now" />
             <View style={styles.trendingList}>
               {TRENDING.map((item, i) => (
                 <TouchableOpacity
@@ -187,35 +293,56 @@ export default function SearchScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </>
+
+            <SectionHeader title="Popular places" />
+            <View style={styles.sectionContent}>
+              {popularPlaces.map(place => <PlaceRow key={place.id} place={place} />)}
+            </View>
+          </View>
+        ) : totalResults === 0 ? (
+          <View style={styles.noResults}>
+            <Text style={styles.noResultsTitle}>No results for "{query}"</Text>
+            <Text style={styles.noResultsBody}>Try a different dish, place, or person</Text>
+          </View>
         ) : (
-          <>
-            {results.length > 0 ? (
-              <>
-                <Text style={styles.resultsLabel}>{results.length} post{results.length !== 1 ? 's' : ''} for "{query}"</Text>
-                <View style={styles.grid}>
-                  <View style={[styles.col, { width: colWidth }]}>
-                    {leftCol.map(post => <PostCard key={post.id} post={post} colWidth={colWidth} />)}
-                  </View>
-                  <View style={[styles.col, { width: colWidth }]}>
-                    {rightCol.map(post => <PostCard key={post.id} post={post} colWidth={colWidth} />)}
-                  </View>
+          <View style={styles.resultsPage}>
+            {peopleResults.length > 0 && (
+              <View>
+                <SectionHeader title="People" count={peopleResults.length} />
+                <View style={styles.sectionContent}>
+                  {peopleResults.slice(0, 5).map(p => <PersonRow key={p.username} person={p} />)}
                 </View>
-              </>
-            ) : (
-              <Text style={styles.noResults}>No posts found</Text>
+              </View>
             )}
-          </>
+            {postResults.length > 0 && (
+              <View>
+                <SectionHeader title="Posts" count={postResults.length} />
+                <View style={styles.sectionContent}>
+                  {postResults.map(p => <PostCompactRow key={p.id} post={p} />)}
+                </View>
+              </View>
+            )}
+            {placeResults.length > 0 && (
+              <View>
+                <SectionHeader title="Places" count={placeResults.length} />
+                <View style={styles.sectionContent}>
+                  {placeResults.slice(0, 8).map(p => <PlaceRow key={p.id} place={p} distanceKm={placeDistances.get(p.id)} />)}
+                </View>
+              </View>
+            )}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 function makeStyles(c: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    topBar: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    topBar: { height: 56, justifyContent: 'center', paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: c.border },
     wordmark: { fontFamily: 'DMSerifDisplay-Regular', fontSize: 22, color: c.text, letterSpacing: -0.5 },
     wordmarkDot: { color: c.accent },
     searchTop: { paddingHorizontal: 16, paddingTop: 10, borderBottomWidth: 0.5, borderBottomColor: c.border, backgroundColor: c.bg },
@@ -229,7 +356,16 @@ function makeStyles(c: ReturnType<typeof useThemeColors>) {
     chipText: { fontSize: 12, color: c.text2 } as any,
     chipTextActive: { color: c.bg },
     scroll: { flex: 1 },
-    sectionLabel: { fontSize: 11, fontWeight: '500', color: c.text3, letterSpacing: 0.7, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+    discoveryPage: { paddingBottom: 24 },
+    peopleChipsRow: { paddingHorizontal: 16, gap: 10, paddingBottom: 16 },
+    personChip: { width: 88, alignItems: 'center' },
+    personChipInner: { alignItems: 'center', gap: 6 },
+    personChipUsername: { fontSize: 11, color: c.text, maxWidth: 84, textAlign: 'center' },
+    personChipFollowers: { fontSize: 10, color: c.text3, textAlign: 'center' },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10 },
+    sectionTitle: { fontSize: 11, fontWeight: '600', color: c.text3, letterSpacing: 0.7 },
+    sectionCount: { fontSize: 11, color: c.text3 },
+    sectionContent: {},
     trendingList: { paddingHorizontal: 16 },
     trendingItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: c.border },
     trendingItemLast: { borderBottomWidth: 0 },
@@ -237,20 +373,30 @@ function makeStyles(c: ReturnType<typeof useThemeColors>) {
     trendingRankHot: { color: c.accent },
     trendingTag: { flex: 1, fontSize: 13, color: c.text },
     trendingCount: { fontSize: 11, color: c.text3 },
-    resultsLabel: { fontSize: 12, color: c.text2, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 10 },
-    grid: { flexDirection: 'row', gap: 6, paddingHorizontal: 8, paddingBottom: 8, alignItems: 'flex-start' },
-    col: { gap: 6 },
-    noResults: { textAlign: 'center', paddingTop: 40, fontSize: 14, color: c.text3 },
-    card: { borderRadius: 10, overflow: 'hidden', backgroundColor: c.surface, borderWidth: 0.5, borderColor: c.border },
-    cardImg: { alignItems: 'center', justifyContent: 'center' },
-    cardInfo: { padding: 7, paddingHorizontal: 9, paddingBottom: 8 },
-    cardTitle: { fontSize: 11.5, color: c.text, lineHeight: 16, marginBottom: 6 },
-    cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    creatorRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    avatarSm: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    avatarSmText: { fontSize: 6.5, fontWeight: '600' },
-    creatorName: { fontSize: 10, color: c.text2 },
-    likeCount: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    likeText: { fontSize: 10, color: c.text3 },
+    personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    personInfo: { flex: 1 },
+    personUsername: { fontSize: 13, fontWeight: '500', color: c.text },
+    personName: { fontSize: 11, color: c.text3, marginTop: 1 },
+    personFollowers: { fontSize: 11, color: c.text3 },
+    followPill: { borderRadius: 16, borderWidth: 1, borderColor: c.border2, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: c.text },
+    followPillActive: { backgroundColor: c.surface },
+    followPillText: { fontSize: 12, fontWeight: '500', color: c.bg },
+    followPillTextActive: { color: c.text },
+    postRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    postThumb: { width: 60, height: 60, borderRadius: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    postRowContent: { flex: 1 },
+    postRowTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
+    postRowCreator: { fontSize: 11, color: c.text3 },
+    postRowLikes: { fontSize: 11, color: c.text3 },
+    postRowTitle: { fontSize: 13, color: c.text, lineHeight: 18, marginBottom: 4 },
+    placeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    placeIconWrap: { width: 32, height: 32, borderRadius: 8, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
+    placeInfo: { flex: 1 },
+    placeName: { fontSize: 13, fontWeight: '500', color: c.text },
+    placeMeta: { fontSize: 11, color: c.text3, marginTop: 2 },
+    resultsPage: { paddingBottom: 24 },
+    noResults: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40, gap: 8 },
+    noResultsTitle: { fontSize: 14, fontWeight: '500', color: c.text, textAlign: 'center' },
+    noResultsBody: { fontSize: 12, color: c.text3, textAlign: 'center' },
   })
 }

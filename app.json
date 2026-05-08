@@ -14,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "REDACTED"
+      },
+      "bundleIdentifier": "com.anonymous.forkyou"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,13 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "REDACTED"
+        }
+      },
+      "package": "com.anonymous.forkyou"
     },
     "web": {
       "bundler": "metro",
@@ -31,7 +41,21 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow forkyou to use your location for nearby search results."
+        }
+      ],
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "REDACTED",
+          "iosGoogleMapsApiKey": "REDACTED",
+          "androidGoogleMapsApiKey": "REDACTED"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

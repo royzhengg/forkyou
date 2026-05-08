@@ -38,6 +38,9 @@ export default function EditProfileScreen() {
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
+  const [suburb, setSuburb] = useState('')
+  const [city, setCity] = useState('')
+  const [country, setCountry] = useState('')
   const [avatarUri, setAvatarUri] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -46,7 +49,7 @@ export default function EditProfileScreen() {
   useEffect(() => {
     if (!user) return
     ;(supabase.from('users') as any)
-      .select('username, full_name, bio, avatar_url')
+      .select('username, full_name, bio, avatar_url, suburb, city, country')
       .eq('id', user.id)
       .single()
       .then(({ data }: any) => {
@@ -54,6 +57,9 @@ export default function EditProfileScreen() {
           setUsername(data.username ?? '')
           setDisplayName(data.full_name ?? '')
           setBio(data.bio ?? '')
+          setSuburb(data.suburb ?? '')
+          setCity(data.city ?? '')
+          setCountry(data.country ?? '')
           setAvatarUrl(data.avatar_url ?? null)
         }
       })
@@ -99,7 +105,14 @@ export default function EditProfileScreen() {
     const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 30)
     const error = await updateProfile(cleanUsername, displayName)
     if (error) { Alert.alert('Error', error); setLoading(false); return }
-    await (supabase.from('users') as any).update({ bio, avatar_url: finalAvatarUrl, updated_at: new Date().toISOString() }).eq('id', user.id)
+    await (supabase.from('users') as any).update({
+      bio,
+      avatar_url: finalAvatarUrl,
+      suburb: suburb.trim() || null,
+      city: city.trim() || null,
+      country: country.trim() || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', user.id)
     setLoading(false)
     router.back()
   }
@@ -185,6 +198,42 @@ export default function EditProfileScreen() {
               maxLength={150}
             />
             <Text style={styles.charCount}>{bio.length}/150</Text>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Suburb</Text>
+            <TextInput
+              style={styles.input}
+              value={suburb}
+              onChangeText={setSuburb}
+              placeholder="Surry Hills"
+              placeholderTextColor={colors.text3}
+              autoCapitalize="words"
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>City</Text>
+            <TextInput
+              style={styles.input}
+              value={city}
+              onChangeText={setCity}
+              placeholder="Sydney"
+              placeholderTextColor={colors.text3}
+              autoCapitalize="words"
+            />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Country</Text>
+            <TextInput
+              style={styles.input}
+              value={country}
+              onChangeText={setCountry}
+              placeholder="Australia"
+              placeholderTextColor={colors.text3}
+              autoCapitalize="words"
+            />
           </View>
         </View>
       </ScrollView>
