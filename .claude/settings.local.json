@@ -9,7 +9,15 @@
       "WebFetch(domain:www.zomato.com)",
       "WebFetch(domain:engineeringblog.yelp.com)",
       "WebFetch(domain:careersatdoordash.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(xcrun simctl *)",
+      "Bash(ls /Users/royzheng/Desktop/forkyou/ios/ 2>/dev/null || echo \"directory not found\")",
+      "Read(//Users/royzheng/Desktop/forkyou/**)",
+      "Bash(ls /Users/royzheng/Desktop/ | grep -i fork)",
+      "Read(//Users/royzheng/Desktop/**)",
+      "Bash(pod install *)",
+      "Bash(cat \"/Users/royzheng/Library/Application Support/Code/User/settings.json\" 2>/dev/null || echo \"NOT_FOUND\")",
+      "Read(//Users/royzheng/Library/Application Support/Code/User/**)"
     ]
   }
 }

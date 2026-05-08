@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Image } from 'react-native'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { imgColors } from '@/constants/Colors'
 import { useThemeColors } from '@/lib/ThemeContext'
 import { usePosts } from '@/lib/PostsContext'
 import { useAuth } from '@/lib/AuthContext'
@@ -10,54 +9,22 @@ import { useAuthGate } from '@/lib/AuthGateContext'
 import { useSavedLocations } from '@/lib/hooks/useSavedLocations'
 import { supabase } from '@/lib/supabase'
 import { MY_CREATOR, MY_INITIALS, MY_AVATAR_BG, MY_AVATAR_COLOR } from '@/lib/data'
-import { SettingsIcon, ShareIcon, ImagePlaceholder } from '@/components/icons'
+import { SettingsIcon, ShareIcon } from '@/components/icons'
 import { ProfileHeader } from '@/components/ProfileHeader'
-import type { Post } from '@/lib/data'
+import { ThumbGrid } from '@/components/ThumbGrid'
+import { parseLikes } from '@/lib/utils/format'
 
 type TabKey = 'posts' | 'saved' | 'liked'
 
-const EmptyTab = React.memo(function EmptyTab({ lines }: { lines: [string, string] }) {
-  const colors = useThemeColors()
-  const styles = useMemo(() => makeStyles(colors), [colors])
+function EmptyTabText({ children }: { children: string }) {
+  const c = useThemeColors()
   return (
-    <View style={styles.emptyTab}>
-      <Text style={styles.emptyText}>{lines[0]}{'\n'}{lines[1]}</Text>
+    <View style={{ alignItems: 'center', justifyContent: 'center', padding: 50 }}>
+      <Text style={{ fontSize: 13, color: c.text3, textAlign: 'center', lineHeight: 20 }}>
+        {children}
+      </Text>
     </View>
   )
-})
-
-const ThumbGrid = React.memo(function ThumbGrid({ posts }: { posts: Post[] }) {
-  const router = useRouter()
-  const { width } = useWindowDimensions()
-  const colors = useThemeColors()
-  const styles = useMemo(() => makeStyles(colors), [colors])
-  const thumbSize = (width - 4) / 3
-
-  if (posts.length === 0) return null
-
-  return (
-    <View style={styles.thumbGrid}>
-      {posts.map(post => (
-        <TouchableOpacity
-          key={post.id}
-          style={[styles.thumb, { width: thumbSize, height: thumbSize }]}
-          onPress={() => router.push(`/post/${post.id}`)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.thumbInner, { backgroundColor: imgColors[post.imgKey] }]}>
-            {post.imageUrl
-              ? <Image source={{ uri: post.imageUrl }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
-              : <ImagePlaceholder size={20} />
-            }
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  )
-})
-
-function parseLikes(s: string): number {
-  return s.endsWith('k') ? parseFloat(s) * 1000 : parseInt(s, 10) || 0
 }
 
 type ProfileInfo = {
@@ -79,29 +46,42 @@ export default function ProfileScreen() {
   const [likedIds, setLikedIds] = useState<string[]>([])
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null)
-  const { savedLocations } = useSavedLocations(user?.id)
+  const [refreshing, setRefreshing] = useState(false)
+  const { savedLocations, refresh: refreshLocations } = useSavedLocations(user?.id)
 
   useEffect(() => {
     if (!user) requireAuth()
   }, [user])
 
-  useEffect(() => {
+  const loadProfileData = useCallback(async () => {
     if (!user) {
       setLikedIds([])
       setSavedIds([])
       setProfileInfo(null)
       return
     }
-    Promise.all([
+    const [likesRes, savesRes, profileRes] = await Promise.all([
       (supabase.from('likes') as any).select('post_id').eq('user_id', user.id).limit(500),
       (supabase.from('saves') as any).select('post_id').eq('user_id', user.id).limit(500),
-      (supabase.from('users') as any).select('full_name, bio, suburb, city, country').eq('id', user.id).single(),
-    ]).then(([likesRes, savesRes, profileRes]) => {
-      if (likesRes.data) setLikedIds(likesRes.data.map((r: any) => r.post_id))
-      if (savesRes.data) setSavedIds(savesRes.data.map((r: any) => r.post_id))
-      if (profileRes.data) setProfileInfo(profileRes.data)
-    })
+      (supabase.from('users') as any)
+        .select('full_name, bio, suburb, city, country')
+        .eq('id', user.id)
+        .single(),
+    ])
+    if (likesRes.data) setLikedIds(likesRes.data.map((r: any) => r.post_id))
+    if (savesRes.data) setSavedIds(savesRes.data.map((r: any) => r.post_id))
+    if (profileRes.data) setProfileInfo(profileRes.data)
   }, [user?.id])
+
+  useEffect(() => {
+    loadProfileData()
+  }, [loadProfileData])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await Promise.all([loadProfileData(), refreshLocations()])
+    setRefreshing(false)
+  }
 
   const myPosts = posts.filter(p => p.creator === MY_CREATOR)
   const savedPosts = posts.filter(p => savedIds.includes(p.dbId))
@@ -130,26 +110,36 @@ export default function ProfileScreen() {
 
   const locationLabel = useMemo(() => {
     if (!profileInfo) return null
-    return [profileInfo.suburb, profileInfo.city, profileInfo.country].filter(Boolean).join(', ') || null
+    return (
+      [profileInfo.suburb, profileInfo.city, profileInfo.country].filter(Boolean).join(', ') || null
+    )
   }, [profileInfo])
 
   const displayName = profileInfo?.full_name ?? 'Sarah Lee'
-  const bio = profileInfo?.bio ?? 'Sydney-based food lover hunting hidden gems and honest eats. No sponsored content, ever.'
+  const bio =
+    profileInfo?.bio ??
+    'Sydney-based food lover hunting hidden gems and honest eats. No sponsored content, ever.'
 
   function tabContent() {
     if (activeTab === 'posts') {
-      return myPosts.length === 0
-        ? <EmptyTab lines={['No posts yet.', 'Share your first food experience.']} />
-        : <ThumbGrid posts={myPosts} />
+      return myPosts.length === 0 ? (
+        <EmptyTabText>{'No posts yet.\nShare your first food experience.'}</EmptyTabText>
+      ) : (
+        <ThumbGrid posts={myPosts} />
+      )
     }
     if (activeTab === 'saved') {
-      return savedPosts.length === 0
-        ? <EmptyTab lines={['No saved posts yet.', 'Bookmark reviews to find them here.']} />
-        : <ThumbGrid posts={savedPosts} />
+      return savedPosts.length === 0 ? (
+        <EmptyTabText>{'No saved posts yet.\nBookmark reviews to find them here.'}</EmptyTabText>
+      ) : (
+        <ThumbGrid posts={savedPosts} />
+      )
     }
-    return likedPosts.length === 0
-      ? <EmptyTab lines={['No liked posts yet.', 'Heart reviews you love.']} />
-      : <ThumbGrid posts={likedPosts} />
+    return likedPosts.length === 0 ? (
+      <EmptyTabText>{'No liked posts yet.\nHeart reviews you love.'}</EmptyTabText>
+    ) : (
+      <ThumbGrid posts={likedPosts} />
+    )
   }
 
   return (
@@ -162,7 +152,16 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.text}
+          />
+        }
+      >
         <ProfileHeader
           initials={MY_INITIALS}
           avatarBg={MY_AVATAR_BG}
@@ -183,7 +182,11 @@ export default function ProfileScreen() {
         {topSpots.length > 0 && (
           <View style={styles.spotsSection}>
             <Text style={styles.spotsLabel}>Favourite spots</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spotsScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.spotsScroll}
+            >
               {topSpots.map(loc => {
                 const r = loc.restaurants
                 if (!r) return null
@@ -191,19 +194,23 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     key={loc.id}
                     style={styles.spotChip}
-                    onPress={() => router.push({
-                      pathname: '/location/[placeId]',
-                      params: {
-                        placeId: r.google_place_id ?? 'none',
-                        name: r.name,
-                        address: r.address ?? '',
-                        lat: String(r.latitude ?? ''),
-                        lng: String(r.longitude ?? ''),
-                      },
-                    })}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/location/[placeId]',
+                        params: {
+                          placeId: r.google_place_id ?? 'none',
+                          name: r.name,
+                          address: r.address ?? '',
+                          lat: String(r.latitude ?? ''),
+                          lng: String(r.longitude ?? ''),
+                        },
+                      })
+                    }
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.spotName} numberOfLines={1}>{r.name}</Text>
+                    <Text style={styles.spotName} numberOfLines={1}>
+                      {r.name}
+                    </Text>
                     {!!r.address && (
                       <Text style={styles.spotAddress} numberOfLines={1}>
                         {r.address.split(',')[0]}
@@ -218,7 +225,10 @@ export default function ProfileScreen() {
 
         {/* Action buttons */}
         <View style={styles.actionBtns}>
-          <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings/edit-profile')}>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => router.push('/settings/edit-profile')}
+          >
             <Text style={styles.editBtnText}>Edit profile</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.shareBtn}>
@@ -251,29 +261,75 @@ export default function ProfileScreen() {
 function makeStyles(c: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    topBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    topBar: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+    },
     username: { fontSize: 15, fontWeight: '500', color: c.text },
-    iconBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
+    iconBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     spotsSection: { paddingTop: 18, paddingLeft: 20 },
     spotsLabel: { fontSize: 11, color: c.text3, marginBottom: 8 },
     spotsScroll: { paddingRight: 20, gap: 8 },
-    spotChip: { backgroundColor: c.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, maxWidth: 140 },
+    spotChip: {
+      backgroundColor: c.surface,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      maxWidth: 140,
+    },
     spotName: { fontSize: 12, fontWeight: '500', color: c.text },
     spotAddress: { fontSize: 10, color: c.text3, marginTop: 2 },
     actionBtns: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 18 },
-    editBtn: { flex: 1, backgroundColor: c.surface, borderWidth: 0.5, borderColor: c.border2, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+    editBtn: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderWidth: 0.5,
+      borderColor: c.border2,
+      borderRadius: 10,
+      paddingVertical: 9,
+      alignItems: 'center',
+    },
     editBtnText: { fontSize: 13, fontWeight: '500', color: c.text },
-    shareBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.surface, borderWidth: 0.5, borderColor: c.border2, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
+    shareBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: c.surface,
+      borderWidth: 0.5,
+      borderColor: c.border2,
+      borderRadius: 10,
+      paddingVertical: 9,
+      paddingHorizontal: 14,
+    },
     shareBtnText: { fontSize: 13, fontWeight: '500', color: c.text },
-    tabs: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: c.border, marginTop: 18 },
-    tab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -0.5 },
+    tabs: {
+      flexDirection: 'row',
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+      marginTop: 18,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+      marginBottom: -0.5,
+    },
     tabActive: { borderBottomColor: c.text },
     tabText: { fontSize: 12, fontWeight: '500', color: c.text3 },
     tabTextActive: { color: c.text },
-    thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, padding: 2 },
-    thumb: { overflow: 'hidden' },
-    thumbInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    emptyTab: { alignItems: 'center', justifyContent: 'center', padding: 50, gap: 10 },
-    emptyText: { fontSize: 13, color: c.text3, textAlign: 'center', lineHeight: 20 },
   })
 }

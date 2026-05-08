@@ -1,5 +1,16 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActionSheetIOS, Linking, Image, ActivityIndicator } from 'react-native'
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  ActionSheetIOS,
+  Linking,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Svg, Path, Circle } from 'react-native-svg'
@@ -8,10 +19,13 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import { useThemeColors } from '@/lib/ThemeContext'
 import { useAuth } from '@/lib/AuthContext'
 import { useSavedLocations, type SavedLocation } from '@/lib/hooks/useSavedLocations'
-import { PinIcon, PhoneIcon, SortIcon } from '@/components/icons'
+import { useUserLocation } from '@/lib/hooks/useUserLocation'
+import { PinIcon, PhoneIcon, SortIcon, NavIcon } from '@/components/icons'
 import { OpenBadge } from '@/components/OpenBadge'
+import { MapMarker } from '@/components/MapMarker'
 
-const PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY ?? ''
+import { GOOGLE_PLACES_KEY as PLACES_KEY } from '@/lib/config'
+import { todayHoursIndex } from '@/lib/utils/format'
 
 type PlaceDetail = {
   rating?: number
@@ -20,12 +34,18 @@ type PlaceDetail = {
   photos?: { photo_reference: string }[]
 }
 
-function todayHoursIndex() { return (new Date().getDay() + 6) % 7 }
-
 function EmptyPinIcon() {
   const colors = useThemeColors()
   return (
-    <Svg width={36} height={36} viewBox="0 0 24 24" fill="none" stroke={colors.text3} strokeWidth={1} strokeLinecap="round">
+    <Svg
+      width={36}
+      height={36}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={colors.text3}
+      strokeWidth={1}
+      strokeLinecap="round"
+    >
       <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
       <Circle cx={12} cy={10} r={3} />
     </Svg>
@@ -78,7 +98,8 @@ export default function PlacesScreen() {
   const { user } = useAuth()
   const colors = useThemeColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
-  const { savedLocations, error } = useSavedLocations(user?.id)
+  const { savedLocations, error, refresh, refreshing } = useSavedLocations(user?.id)
+  const gps = useUserLocation()
   const [placesView, setPlacesView] = useState<'list' | 'map'>('list')
   const [sortBy, setSortBy] = useState<'alpha' | 'recent' | 'oldest'>('alpha')
   const [selectedLocation, setSelectedLocation] = useState<SavedLocation | null>(null)
@@ -88,19 +109,35 @@ export default function PlacesScreen() {
   const lastMarkerPress = useRef(0)
   const mapRef = useRef<MapView>(null)
   const deltaRef = useRef(0.08)
+  const currentRegionRef = useRef({
+    latitude: 0,
+    longitude: 0,
+    latitudeDelta: 0.08,
+    longitudeDelta: 0.08,
+  })
+  const hasAnimatedToGps = useRef(false)
 
   useEffect(() => {
-    if (!selectedLocation) { setPinDetail(null); setPinPhoto(''); return }
+    if (!selectedLocation) {
+      setPinDetail(null)
+      setPinPhoto('')
+      return
+    }
     const pid = selectedLocation.restaurants?.google_place_id
     if (!pid || !PLACES_KEY) return
     setPinLoading(true)
-    fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=rating,formatted_phone_number,opening_hours,photos&key=${PLACES_KEY}`)
+    fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${pid}&fields=rating,formatted_phone_number,opening_hours,photos&key=${PLACES_KEY}`
+    )
       .then(r => r.json())
       .then(json => {
         const result: PlaceDetail = json.result ?? {}
         setPinDetail(result)
         const ref = result.photos?.[0]?.photo_reference
-        if (ref) setPinPhoto(`https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${ref}&key=${PLACES_KEY}`)
+        if (ref)
+          setPinPhoto(
+            `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${ref}&key=${PLACES_KEY}`
+          )
         else setPinPhoto('')
       })
       .catch(() => {})
@@ -108,22 +145,43 @@ export default function PlacesScreen() {
   }, [selectedLocation?.id])
 
   const validLocations = useMemo(
-    () => savedLocations.filter(l => l.restaurants?.latitude != null && l.restaurants?.longitude != null),
+    () =>
+      savedLocations.filter(
+        l => l.restaurants?.latitude != null && l.restaurants?.longitude != null
+      ),
     [savedLocations]
   )
 
+  useEffect(() => {
+    if (!gps || hasAnimatedToGps.current) return
+    hasAnimatedToGps.current = true
+    mapRef.current?.animateToRegion(
+      {
+        latitude: gps.lat,
+        longitude: gps.lng,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      },
+      600
+    )
+  }, [gps])
+
   const zoom = useCallback((direction: 'in' | 'out') => {
     const factor = direction === 'in' ? 0.5 : 2
-    deltaRef.current = Math.min(Math.max(deltaRef.current * factor, 0.001), 50)
-    const center = selectedLocation?.restaurants ?? (validLocations[0]?.restaurants ?? null)
-    if (!center?.latitude || !center?.longitude) return
-    mapRef.current?.animateToRegion({
-      latitude: center.latitude,
-      longitude: center.longitude,
-      latitudeDelta: deltaRef.current,
-      longitudeDelta: deltaRef.current,
-    }, 300)
-  }, [selectedLocation, validLocations])
+    deltaRef.current = Math.min(
+      Math.max(currentRegionRef.current.latitudeDelta * factor, 0.001),
+      50
+    )
+    mapRef.current?.animateToRegion(
+      {
+        latitude: currentRegionRef.current.latitude,
+        longitude: currentRegionRef.current.longitude,
+        latitudeDelta: deltaRef.current,
+        longitudeDelta: deltaRef.current,
+      },
+      300
+    )
+  }, [])
 
   const slideY = useSharedValue(300)
 
@@ -136,41 +194,53 @@ export default function PlacesScreen() {
   }))
 
   const defaultRegion = useMemo(() => {
-    if (validLocations.length === 0) return { latitude: -33.8688, longitude: 151.2093, latitudeDelta: 0.1, longitudeDelta: 0.1 }
-    return {
-      latitude: validLocations[0].restaurants!.latitude!,
-      longitude: validLocations[0].restaurants!.longitude!,
-      latitudeDelta: 0.08,
-      longitudeDelta: 0.08,
-    }
-  }, [validLocations])
+    if (gps)
+      return { latitude: gps.lat, longitude: gps.lng, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+    if (validLocations.length > 0)
+      return {
+        latitude: validLocations[0].restaurants!.latitude!,
+        longitude: validLocations[0].restaurants!.longitude!,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      }
+    return { latitude: -33.8688, longitude: 151.2093, latitudeDelta: 0.1, longitudeDelta: 0.1 }
+  }, [gps, validLocations])
 
   const recentLocations = useMemo(
-    () => [...savedLocations].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    () =>
+      [...savedLocations].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ),
     [savedLocations]
   )
 
   const oldestLocations = useMemo(
-    () => [...savedLocations].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    () =>
+      [...savedLocations].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ),
     [savedLocations]
   )
 
   const alphaGroups = useMemo(() => groupAlpha(savedLocations), [savedLocations])
 
-  const navigateTo = useCallback((loc: SavedLocation) => {
-    const r = loc.restaurants
-    if (!r?.latitude || !r?.longitude) return
-    router.push({
-      pathname: '/location/[placeId]',
-      params: {
-        placeId: r.google_place_id ?? 'none',
-        name: r.name,
-        address: r.address ?? '',
-        lat: String(r.latitude),
-        lng: String(r.longitude),
-      },
-    })
-  }, [router])
+  const navigateTo = useCallback(
+    (loc: SavedLocation) => {
+      const r = loc.restaurants
+      if (!r?.latitude || !r?.longitude) return
+      router.push({
+        pathname: '/location/[placeId]',
+        params: {
+          placeId: r.google_place_id ?? 'none',
+          name: r.name,
+          address: r.address ?? '',
+          lat: String(r.latitude),
+          lng: String(r.longitude),
+        },
+      })
+    },
+    [router]
+  )
 
   const openInMaps = useCallback((loc: SavedLocation) => {
     const r = loc.restaurants
@@ -178,9 +248,11 @@ export default function PlacesScreen() {
     const { latitude: lat, longitude: lng, name } = r
     ActionSheetIOS.showActionSheetWithOptions(
       { options: ['Cancel', 'Apple Maps', 'Google Maps'], cancelButtonIndex: 0 },
-      (i) => {
-        if (i === 1) Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(name)}&ll=${lat},${lng}`)
-        if (i === 2) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`)
+      i => {
+        if (i === 1)
+          Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(name)}&ll=${lat},${lng}`)
+        if (i === 2)
+          Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`)
       }
     )
   }, [])
@@ -194,7 +266,9 @@ export default function PlacesScreen() {
       {savedLocations.length === 0 ? (
         <View style={styles.empty}>
           <EmptyPinIcon />
-          <Text style={styles.emptyTitle}>{error ? 'Could not load places' : 'No saved places yet'}</Text>
+          <Text style={styles.emptyTitle}>
+            {error ? 'Could not load places' : 'No saved places yet'}
+          </Text>
           <Text style={styles.emptyBody}>
             {error ? error : 'Tap the pin icon on a post\nto save a location.'}
           </Text>
@@ -206,13 +280,20 @@ export default function PlacesScreen() {
               style={[styles.toggleBtn, placesView === 'list' && styles.toggleBtnActive]}
               onPress={() => setPlacesView('list')}
             >
-              <Text style={[styles.toggleText, placesView === 'list' && styles.toggleTextActive]}>List</Text>
+              <Text style={[styles.toggleText, placesView === 'list' && styles.toggleTextActive]}>
+                List
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleBtn, placesView === 'map' && styles.toggleBtnActive]}
-              onPress={() => { setPlacesView('map'); setSelectedLocation(null) }}
+              onPress={() => {
+                setPlacesView('map')
+                setSelectedLocation(null)
+              }}
             >
-              <Text style={[styles.toggleText, placesView === 'map' && styles.toggleTextActive]}>Map</Text>
+              <Text style={[styles.toggleText, placesView === 'map' && styles.toggleTextActive]}>
+                Map
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -225,35 +306,59 @@ export default function PlacesScreen() {
               <View style={styles.sortHeader}>
                 <TouchableOpacity
                   style={styles.sortBtn}
-                  onPress={() => ActionSheetIOS.showActionSheetWithOptions(
-                    { options: ['Cancel', 'A–Z', 'Last saved', 'Oldest saved'], cancelButtonIndex: 0 },
-                    (i) => {
-                      if (i === 1) setSortBy('alpha')
-                      if (i === 2) setSortBy('recent')
-                      if (i === 3) setSortBy('oldest')
-                    }
-                  )}
+                  onPress={() =>
+                    ActionSheetIOS.showActionSheetWithOptions(
+                      {
+                        options: ['Cancel', 'A–Z', 'Last saved', 'Oldest saved'],
+                        cancelButtonIndex: 0,
+                      },
+                      i => {
+                        if (i === 1) setSortBy('alpha')
+                        if (i === 2) setSortBy('recent')
+                        if (i === 3) setSortBy('oldest')
+                      }
+                    )
+                  }
                 >
                   <SortIcon />
                   <Text style={styles.sortBtnText}>
-                    {sortBy === 'alpha' ? 'A–Z' : sortBy === 'recent' ? 'Last saved' : 'Oldest saved'}
+                    {sortBy === 'alpha'
+                      ? 'A–Z'
+                      : sortBy === 'recent'
+                        ? 'Last saved'
+                        : 'Oldest saved'}
                   </Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={{ flex: 1 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={refresh}
+                    tintColor={colors.text}
+                  />
+                }
+              >
                 {sortBy === 'alpha'
                   ? alphaGroups.map(({ letter, items }) => (
                       <View key={letter}>
                         <View style={styles.letterHeader}>
                           <Text style={styles.letterText}>{letter}</Text>
                         </View>
-                        {items.map(loc => <LocationRow key={loc.id} loc={loc} onPress={navigateTo} />)}
+                        {items.map(loc => (
+                          <LocationRow key={loc.id} loc={loc} onPress={navigateTo} />
+                        ))}
                       </View>
                     ))
                   : sortBy === 'oldest'
-                    ? oldestLocations.map(loc => <LocationRow key={loc.id} loc={loc} onPress={navigateTo} />)
-                    : recentLocations.map(loc => <LocationRow key={loc.id} loc={loc} onPress={navigateTo} />)
-                }
+                    ? oldestLocations.map(loc => (
+                        <LocationRow key={loc.id} loc={loc} onPress={navigateTo} />
+                      ))
+                    : recentLocations.map(loc => (
+                        <LocationRow key={loc.id} loc={loc} onPress={navigateTo} />
+                      ))}
               </ScrollView>
             </View>
 
@@ -266,6 +371,9 @@ export default function PlacesScreen() {
                 provider={PROVIDER_GOOGLE}
                 style={{ flex: 1 }}
                 initialRegion={defaultRegion}
+                onRegionChangeComplete={r => {
+                  currentRegionRef.current = r
+                }}
                 onPress={() => {
                   // PROVIDER_GOOGLE fires MapView.onPress even when a Marker is tapped.
                   // Ignore the map tap if it fired within 400ms of a marker press.
@@ -282,19 +390,49 @@ export default function PlacesScreen() {
                       longitude: loc.restaurants!.longitude!,
                     }}
                     tracksViewChanges={false}
+                    anchor={{ x: 0.5, y: 1 }}
                     onPress={() => {
                       lastMarkerPress.current = Date.now()
                       setSelectedLocation(loc)
                     }}
-                  />
+                  >
+                    <MapMarker name={loc.restaurants?.name ?? ''} />
+                  </Marker>
                 ))}
               </MapView>
+              {gps && (
+                <TouchableOpacity
+                  style={styles.locateBtn}
+                  onPress={() =>
+                    mapRef.current?.animateToRegion(
+                      {
+                        latitude: gps.lat,
+                        longitude: gps.lng,
+                        latitudeDelta: currentRegionRef.current.latitudeDelta,
+                        longitudeDelta: currentRegionRef.current.longitudeDelta,
+                      },
+                      400
+                    )
+                  }
+                  activeOpacity={0.8}
+                >
+                  <NavIcon size={18} />
+                </TouchableOpacity>
+              )}
               <View style={styles.zoomControls}>
-                <TouchableOpacity style={styles.zoomBtn} onPress={() => zoom('in')} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.zoomBtn}
+                  onPress={() => zoom('in')}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.zoomBtnText}>+</Text>
                 </TouchableOpacity>
                 <View style={styles.zoomDivider} />
-                <TouchableOpacity style={styles.zoomBtn} onPress={() => zoom('out')} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.zoomBtn}
+                  onPress={() => zoom('out')}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.zoomBtnText}>−</Text>
                 </TouchableOpacity>
               </View>
@@ -304,7 +442,13 @@ export default function PlacesScreen() {
                 pointerEvents={selectedLocation ? 'auto' : 'none'}
               >
                 <View style={styles.cardHandle} />
-                {pinLoading && <ActivityIndicator size="small" color={colors.text3} style={{ marginBottom: 4 }} />}
+                {pinLoading && (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.text3}
+                    style={{ marginBottom: 4 }}
+                  />
+                )}
                 {!!pinPhoto && (
                   <Image source={{ uri: pinPhoto }} style={styles.cardPhoto} resizeMode="cover" />
                 )}
@@ -321,12 +465,20 @@ export default function PlacesScreen() {
                 </View>
                 {(() => {
                   const todayText = pinDetail?.opening_hours?.weekday_text?.[todayHoursIndex()]
-                  return todayText ? <Text style={styles.cardHours} numberOfLines={1}>{todayText}</Text> : null
+                  return todayText ? (
+                    <Text style={styles.cardHours} numberOfLines={1}>
+                      {todayText}
+                    </Text>
+                  ) : null
                 })()}
                 {!!pinDetail?.formatted_phone_number && (
                   <TouchableOpacity
                     style={styles.cardPhoneRow}
-                    onPress={() => Linking.openURL(`tel:${pinDetail!.formatted_phone_number!.replace(/\s/g, '')}`)}
+                    onPress={() =>
+                      Linking.openURL(
+                        `tel:${pinDetail!.formatted_phone_number!.replace(/\s/g, '')}`
+                      )
+                    }
                   >
                     <PhoneIcon />
                     <Text style={styles.cardPhoneText}>{pinDetail.formatted_phone_number}</Text>
@@ -358,37 +510,88 @@ export default function PlacesScreen() {
 function makeStyles(c: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    topBar: { height: 56, justifyContent: 'center', paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    topBar: {
+      height: 56,
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+    },
     title: { fontSize: 15, fontWeight: '500', color: c.text },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 40 },
+    empty: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      paddingHorizontal: 40,
+    },
     emptyTitle: { fontSize: 13, fontWeight: '500', color: c.text3, textAlign: 'center' },
     emptyBody: { fontSize: 12, color: c.text3, textAlign: 'center', lineHeight: 18 },
     content: { flex: 1 },
-    toggleRow: { flexDirection: 'row', backgroundColor: c.surface, borderRadius: 8, margin: 16, marginBottom: 0, padding: 3, gap: 3 },
+    toggleRow: {
+      flexDirection: 'row',
+      backgroundColor: c.surface,
+      borderRadius: 8,
+      margin: 16,
+      marginBottom: 0,
+      padding: 3,
+      gap: 3,
+    },
     toggleBtn: { flex: 1, paddingVertical: 6, borderRadius: 6, alignItems: 'center' },
     toggleBtnActive: { backgroundColor: c.bg },
     toggleText: { fontSize: 12, fontWeight: '500', color: c.text3 },
     toggleTextActive: { color: c.text },
     viewsContainer: { flex: 1 },
-    sortHeader: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    sortHeader: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+    },
     sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     sortBtnText: { fontSize: 12, color: c.text2 },
     letterHeader: { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: c.surface },
     letterText: { fontSize: 11, fontWeight: '600', color: c.text3 },
-    placeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    placeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+    },
     placeRowName: { fontSize: 13, fontWeight: '500', color: c.text, marginBottom: 2 },
     placeRowAddress: { fontSize: 11, color: c.text3 },
     locationCard: {
-      position: 'absolute', bottom: 0, left: 0, right: 0,
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
       backgroundColor: c.bg,
-      borderTopLeftRadius: 16, borderTopRightRadius: 16,
-      borderTopWidth: 0.5, borderTopColor: c.border,
-      paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      borderTopWidth: 0.5,
+      borderTopColor: c.border,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 32,
       gap: 4,
-      shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
-      shadowOpacity: 0.06, shadowRadius: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
     },
-    cardHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.border2, alignSelf: 'center', marginBottom: 10 },
+    cardHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.border2,
+      alignSelf: 'center',
+      marginBottom: 10,
+    },
     cardPhoto: { width: '100%', height: 130, borderRadius: 10, marginBottom: 4 },
     cardName: { fontSize: 16, fontWeight: '600', color: c.text },
     cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -397,11 +600,50 @@ function makeStyles(c: ReturnType<typeof useThemeColors>) {
     cardPhoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     cardPhoneText: { fontSize: 12, color: c.text2 },
     cardActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-    cardBtnPrimary: { flex: 1, borderRadius: 20, backgroundColor: c.text, paddingVertical: 11, alignItems: 'center' },
+    cardBtnPrimary: {
+      flex: 1,
+      borderRadius: 20,
+      backgroundColor: c.text,
+      paddingVertical: 11,
+      alignItems: 'center',
+    },
     cardBtnPrimaryText: { fontSize: 13, fontWeight: '500', color: c.bg },
-    cardBtnSecondary: { flex: 1, borderRadius: 20, borderWidth: 1, borderColor: c.border2, paddingVertical: 11, alignItems: 'center' },
+    cardBtnSecondary: {
+      flex: 1,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: c.border2,
+      paddingVertical: 11,
+      alignItems: 'center',
+    },
     cardBtnSecondaryText: { fontSize: 13, fontWeight: '500', color: c.text },
-    zoomControls: { position: 'absolute', right: 16, bottom: 24, backgroundColor: c.bg, borderRadius: 10, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 },
+    locateBtn: {
+      position: 'absolute',
+      right: 16,
+      bottom: 116,
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor: c.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+    },
+    zoomControls: {
+      position: 'absolute',
+      right: 16,
+      bottom: 24,
+      backgroundColor: c.bg,
+      borderRadius: 10,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+    },
     zoomBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
     zoomBtnText: { fontSize: 22, fontWeight: '300', color: c.text, lineHeight: 26 },
     zoomDivider: { height: 0.5, backgroundColor: c.border },

@@ -55,6 +55,8 @@ export interface Database {
           google_place_id: string | null
           cuisine_type: string | null
           price_range: number | null
+          google_rating: number | null
+          google_review_count: number | null
           created_at: string
           updated_at: string
         }
@@ -69,6 +71,8 @@ export interface Database {
           google_place_id?: string | null
           cuisine_type?: string | null
           price_range?: number | null
+          google_rating?: number | null
+          google_review_count?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -83,7 +87,35 @@ export interface Database {
           google_place_id?: string | null
           cuisine_type?: string | null
           price_range?: number | null
+          google_rating?: number | null
+          google_review_count?: number | null
           updated_at?: string
+        }
+      }
+      analytics_events: {
+        Row: {
+          id: string
+          user_id: string | null
+          event_type: string
+          entity_type: string | null
+          entity_id: string | null
+          metadata: Record<string, unknown> | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          event_type: string
+          entity_type?: string | null
+          entity_id?: string | null
+          metadata?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Update: {
+          event_type?: string
+          entity_type?: string | null
+          entity_id?: string | null
+          metadata?: Record<string, unknown> | null
         }
       }
       posts: {

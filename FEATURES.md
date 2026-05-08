@@ -1,4 +1,4 @@
-# forkyou — Feature Tracker
+# Rekkus — Feature Tracker
 
 Track of all implemented screens, flows, and features. Update as new work is shipped.
 
@@ -10,44 +10,44 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 
 ### Tab bar — `app/(tabs)/`
 
-| Screen | File | Status |
-|---|---|---|
-| Feed | `app/(tabs)/feed.tsx` | ✅ Done |
-| Search | `app/(tabs)/search.tsx` | ✅ Done |
-| Create (post) | `app/(tabs)/post.tsx` | ✅ Done |
-| Places | `app/(tabs)/places.tsx` | ✅ Done |
-| Profile | `app/(tabs)/profile.tsx` | ✅ Done |
-| Alerts (no tab) | `app/(tabs)/alerts.tsx` | ✅ Done — accessible via bell icon in Feed |
+| Screen          | File                     | Status                                     |
+| --------------- | ------------------------ | ------------------------------------------ |
+| Feed            | `app/(tabs)/feed.tsx`    | ✅ Done                                    |
+| Search          | `app/(tabs)/search.tsx`  | ✅ Done                                    |
+| Create (post)   | `app/(tabs)/post.tsx`    | ✅ Done                                    |
+| Places          | `app/(tabs)/places.tsx`  | ✅ Done                                    |
+| Profile         | `app/(tabs)/profile.tsx` | ✅ Done                                    |
+| Alerts (no tab) | `app/(tabs)/alerts.tsx`  | ✅ Done — accessible via bell icon in Feed |
 
 ### Post detail — `app/post/`
 
-| Screen | File | Status |
-|---|---|---|
+| Screen      | File                | Status  |
+| ----------- | ------------------- | ------- |
 | Post detail | `app/post/[id].tsx` | ✅ Done |
 
 ### Location — `app/location/`
 
-| Screen | File | Status |
-|---|---|---|
+| Screen        | File                         | Status  |
+| ------------- | ---------------------------- | ------- |
 | Location info | `app/location/[placeId].tsx` | ✅ Done |
-| Location map | `app/location/map.tsx` | ✅ Done |
+| Location map  | `app/location/map.tsx`       | ✅ Done |
 
 ### Auth — `app/(auth)/`
 
-| Screen | File | Status |
-|---|---|---|
-| Welcome | `app/(auth)/welcome.tsx` | ✅ Done |
-| Sign in | `app/(auth)/login.tsx` | ✅ Done |
-| Sign up (step 1 — credentials) | `app/(auth)/signup.tsx` | ✅ Done |
-| Sign up (step 2 — profile) | `app/(auth)/signup-profile.tsx` | ✅ Done |
+| Screen                         | File                            | Status  |
+| ------------------------------ | ------------------------------- | ------- |
+| Welcome                        | `app/(auth)/welcome.tsx`        | ✅ Done |
+| Sign in                        | `app/(auth)/login.tsx`          | ✅ Done |
+| Sign up (step 1 — credentials) | `app/(auth)/signup.tsx`         | ✅ Done |
+| Sign up (step 2 — profile)     | `app/(auth)/signup-profile.tsx` | ✅ Done |
 
 ### Settings — `app/settings/`
 
-| Screen | File | Status |
-|---|---|---|
-| Settings hub | `app/settings/index.tsx` | ✅ Done |
-| Edit profile | `app/settings/edit-profile.tsx` | ✅ Done |
-| Change email | `app/settings/change-email.tsx` | ✅ Done |
+| Screen          | File                               | Status  |
+| --------------- | ---------------------------------- | ------- |
+| Settings hub    | `app/settings/index.tsx`           | ✅ Done |
+| Edit profile    | `app/settings/edit-profile.tsx`    | ✅ Done |
+| Change email    | `app/settings/change-email.tsx`    | ✅ Done |
 | Change password | `app/settings/change-password.tsx` | ✅ Done |
 
 ---
@@ -55,6 +55,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 ## Features
 
 ### Feed
+
 - Wordmark top bar with notification bell — taps to open Alerts screen
 - Following / Discover tab switcher (visual only — not yet data-backed)
 - Two-column masonry grid of post cards
@@ -62,6 +63,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - Tap card → push to post detail
 
 ### Search
+
 - Search input with clear button
 - Discovery page (no query): People to follow chips, Trending now, Popular places
 - Results page: People / Posts / Places in separate sections with counts
@@ -72,6 +74,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - Searching by cuisine type (e.g. "chinese") surfaces posts even if the word isn't in the title/body
 
 ### Create (post)
+
 - Photo upload area (dashed border 4:3 placeholder) / preview strip after selection
 - Title input (max 100 chars, counter)
 - Body / review input (multiline)
@@ -84,6 +87,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - Auth gate on mount — guests are prompted before accessing
 
 ### Alerts
+
 - Not a bottom nav tab — accessible via bell icon in Feed header
 - Empty state with bell icon and copy
 - Like, comment, follow notifications from Supabase
@@ -91,6 +95,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - Auth gate on mount — guests are prompted before accessing
 
 ### Places
+
 - Dedicated bottom nav tab (replaced Alerts tab)
 - **List view**: alphabetical with letter headers (A, B, C…) or sorted by "Last saved" / "Oldest saved"
 - Sort button → ActionSheetIOS with 3 options: A–Z, Last saved, Oldest saved
@@ -101,6 +106,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - `useFocusEffect` refreshes data on tab focus
 
 ### Profile
+
 - Username top bar + settings gear (navigates to /settings)
 - Centered 80px avatar circle with initials
 - Reviewer badge pill (✦ Explorer / Quality hunter / Prolific reviewer / Local expert) — computed from post count + avg food rating
@@ -114,12 +120,14 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - Auth gate on mount — guests are prompted before accessing
 
 ### Other user profiles (`app/user/[username].tsx`)
+
 - Accessible by tapping any creator name in feed, post detail, or search
 - Same centred layout with reviewer badge + stats card + bio
 - Follow + Message buttons (Follow auth-gated)
 - Posts-only tab (Saved/Liked are private)
 
 ### Location feature
+
 - Location pill on post detail → taps open Location info screen
 - Geocode-on-tap for old posts with no coordinates (Places Text Search API)
 - Bookmark icon next to location pill on post detail to save/unsave
@@ -127,15 +135,15 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
   - Photo carousel (up to 6 photos from Google Places, horizontal scroll, 220px)
   - "No images available" placeholder when none exist
   - Name, category, price level, Open/Closed badge (from Google Places Details API)
-  - Ratings card: Google ⭐ rating + review count; forkyou 🍴/🎭/💰 averages in one surface block
-  - forkyou ratings computed from PostsContext posts matched by placeId or restaurant name
+  - Ratings card: Google ⭐ rating + review count; Rekkus 🍴/🎭/💰 averages in one surface block
+  - Rekkus ratings computed from PostsContext posts matched by placeId or restaurant name
   - Contact rows: address (→ ActionSheetIOS Apple/Google Maps), phone (→ `tel:`), website (→ in-app browser), hours (collapsible — shows today by default, tap to expand all days)
   - Posts section: compact rows (60×60 thumbnail, creator, title, ratings, likes)
   - Post sort — ActionSheetIOS: Most liked (default), Newest, Oldest
   - Header: back button, navigation icon (→ full-screen map), bookmark icon (save/unsave)
 - **Location map screen** (`location/map.tsx`):
   - Full-screen Google Maps with single pin
-  - Tap pin → Reanimated bottom card slides up: name, ⭐ Google rating, Open/Closed badge, forkyou ratings, phone
+  - Tap pin → Reanimated bottom card slides up: name, ⭐ Google rating, Open/Closed badge, Rekkus ratings, phone
   - "Open in Maps" → ActionSheetIOS (Apple Maps / Google Maps)
   - Tap map to dismiss card (debounced to avoid marker/map press conflict)
 - `saved_locations` Supabase table (user_id + restaurant_id, RLS)
@@ -143,6 +151,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - `food_rating`, `vibe_rating`, `cost_rating` columns on `posts` table (migration `20240110000000_post_ratings.sql`)
 
 ### Post detail
+
 - 4:3 photo area with dot pagination indicators
 - Like / comment / save / share action bar
 - Follow pill button
@@ -153,6 +162,7 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - All interactive actions (like, save, follow, comment send) gated — guests shown auth prompt
 
 ### Auth flow
+
 - Email + password sign-in
 - Email + password sign-up (2 steps: credentials → profile)
 - Google OAuth (WebBrowser + token extraction + setSession)
@@ -160,9 +170,10 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 - Soft auth gate — guests browse freely, prompted on interaction
 - `AuthContext` — user, session, loading; signIn/signUp/updateProfile/signInWithGoogle/signOut
 - `AuthGateContext` — `requireAuth()` shows bottom sheet modal if not signed in
-- `AuthPromptModal` — bottom sheet with "Join forkyou." CTA
+- `AuthPromptModal` — bottom sheet with "Join Rekkus." CTA
 
 ### Settings
+
 - Settings hub with sections: Account, Notifications, Privacy, Appearance, About, Danger zone
 - Toggles persisted to `user_settings` Supabase table (upsert on change)
 - Edit profile: avatar upload (expo-image-picker → Supabase Storage), username, display name, bio
@@ -175,33 +186,33 @@ Feature areas with their own design docs: [Feed](FEED.md) · [Search](SEARCH.md)
 
 ## Infrastructure
 
-| Area | File(s) | Notes |
-|---|---|---|
-| Design tokens | `constants/Colors.ts` | `colors`, `imgColors` |
-| Supabase client | `lib/supabase.ts` | Typed with `Database` |
-| Database types | `types/database.ts` | All tables including `user_settings`, `saved_locations` |
-| Mock data | `lib/data.ts` | 6 posts, 10 restaurants |
-| Posts context | `lib/PostsContext.tsx` | In-memory; `addPost()` |
-| Auth context | `lib/AuthContext.tsx` | Full Supabase auth |
-| Auth gate context | `lib/AuthGateContext.tsx` | Soft gate + modal |
-| Settings context | `lib/SettingsContext.tsx` | Loads/saves `user_settings` |
-| Fonts | `assets/fonts/DMSerifDisplay-Regular.ttf` | Wordmark only |
-| DB migration | `supabase/migrations/20240101000000_initial_schema.sql` | Full schema + RLS + storage |
-| DB migration | `supabase/migrations/20240103000000_saved_locations.sql` | `saved_locations` table + RLS |
-| DB migration | `supabase/migrations/20240110000000_post_ratings.sql` | `food_rating`, `vibe_rating`, `cost_rating` on posts |
-| DB migration | `supabase/migrations/20240115000000_user_location.sql` | `suburb`, `city`, `country` on users |
-| DB migration | `supabase/migrations/20240116000000_post_cuisine_type.sql` | `cuisine_type` on posts |
-| Search hook | `lib/hooks/useSearch.ts` | BM25-style scoring; debounced Supabase merge |
-| Mock users | `lib/data.ts` → `MOCK_USERS` | 5 users with bios, locations, follower counts |
-| Saved locations hook | `lib/hooks/useSavedLocations.ts` | Fetches saved locations with restaurant join; refreshes on tab focus |
-| Alerts hook | `lib/hooks/useAlerts.ts` | Fetches likes + comments in parallel; pull-to-refresh |
-| Google Places API | REST (no library) | Autocomplete, Place Details, Text Search, Photos — key in `.env` |
-| Google Maps | `react-native-maps` 1.27.2 | `PROVIDER_GOOGLE`, requires native build |
-| Tab bar | `app/(tabs)/_layout.tsx` | Custom SVG icons, no Ionicons |
-| Custom post button | `components/TabBarPostButton.tsx` | Auth-gated + button |
-| Auth prompt modal | `components/AuthPromptModal.tsx` | Bottom sheet CTA |
-| Root layout | `app/_layout.tsx` | Provider stack + font load |
-| Settings layout | `app/settings/_layout.tsx` | Stack with no header |
+| Area                 | File(s)                                                    | Notes                                                                |
+| -------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| Design tokens        | `constants/Colors.ts`                                      | `colors`, `imgColors`                                                |
+| Supabase client      | `lib/supabase.ts`                                          | Typed with `Database`                                                |
+| Database types       | `types/database.ts`                                        | All tables including `user_settings`, `saved_locations`              |
+| Mock data            | `lib/data.ts`                                              | 6 posts, 10 restaurants                                              |
+| Posts context        | `lib/PostsContext.tsx`                                     | In-memory; `addPost()`                                               |
+| Auth context         | `lib/AuthContext.tsx`                                      | Full Supabase auth                                                   |
+| Auth gate context    | `lib/AuthGateContext.tsx`                                  | Soft gate + modal                                                    |
+| Settings context     | `lib/SettingsContext.tsx`                                  | Loads/saves `user_settings`                                          |
+| Fonts                | `assets/fonts/DMSerifDisplay-Regular.ttf`                  | Wordmark only                                                        |
+| DB migration         | `supabase/migrations/20240101000000_initial_schema.sql`    | Full schema + RLS + storage                                          |
+| DB migration         | `supabase/migrations/20240103000000_saved_locations.sql`   | `saved_locations` table + RLS                                        |
+| DB migration         | `supabase/migrations/20240110000000_post_ratings.sql`      | `food_rating`, `vibe_rating`, `cost_rating` on posts                 |
+| DB migration         | `supabase/migrations/20240115000000_user_location.sql`     | `suburb`, `city`, `country` on users                                 |
+| DB migration         | `supabase/migrations/20240116000000_post_cuisine_type.sql` | `cuisine_type` on posts                                              |
+| Search hook          | `lib/hooks/useSearch.ts`                                   | BM25-style scoring; debounced Supabase merge                         |
+| Mock users           | `lib/data.ts` → `MOCK_USERS`                               | 5 users with bios, locations, follower counts                        |
+| Saved locations hook | `lib/hooks/useSavedLocations.ts`                           | Fetches saved locations with restaurant join; refreshes on tab focus |
+| Alerts hook          | `lib/hooks/useAlerts.ts`                                   | Fetches likes + comments in parallel; pull-to-refresh                |
+| Google Places API    | REST (no library)                                          | Autocomplete, Place Details, Text Search, Photos — key in `.env`     |
+| Google Maps          | `react-native-maps` 1.27.2                                 | `PROVIDER_GOOGLE`, requires native build                             |
+| Tab bar              | `app/(tabs)/_layout.tsx`                                   | Custom SVG icons, no Ionicons                                        |
+| Custom post button   | `components/TabBarPostButton.tsx`                          | Auth-gated + button                                                  |
+| Auth prompt modal    | `components/AuthPromptModal.tsx`                           | Bottom sheet CTA                                                     |
+| Root layout          | `app/_layout.tsx`                                          | Provider stack + font load                                           |
+| Settings layout      | `app/settings/_layout.tsx`                                 | Stack with no header                                                 |
 
 ---
 

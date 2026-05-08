@@ -18,12 +18,15 @@ export type SavedLocation = {
 export function useSavedLocations(userId: string | undefined) {
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-  const refresh = useCallback(async () => {
+  const fetch = useCallback(async () => {
     if (!userId) return
     setError(null)
     const { data, error: fetchError } = await (supabase.from('saved_locations') as any)
-      .select('id, restaurant_id, created_at, restaurants(name, address, latitude, longitude, google_place_id)')
+      .select(
+        'id, restaurant_id, created_at, restaurants(name, address, latitude, longitude, google_place_id)'
+      )
       .eq('user_id', userId)
       .limit(100)
     if (fetchError) {
@@ -33,9 +36,17 @@ export function useSavedLocations(userId: string | undefined) {
     if (data) setSavedLocations(data)
   }, [userId])
 
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetch()
+    setRefreshing(false)
+  }, [fetch])
+
   useFocusEffect(
-    useCallback(() => { refresh() }, [refresh])
+    useCallback(() => {
+      fetch()
+    }, [fetch])
   )
 
-  return { savedLocations, error, refresh }
+  return { savedLocations, error, refresh, refreshing }
 }

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "forkyou",
-    "slug": "forkyou",
+    "name": "Rekkus",
+    "slug": "rekkus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "forkyou",
+    "scheme": "rekkus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -18,7 +18,7 @@
       "config": {
         "googleMapsApiKey": "REDACTED"
       },
-      "bundleIdentifier": "com.anonymous.forkyou"
+      "bundleIdentifier": "com.anonymous.rekkus"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +32,7 @@
           "apiKey": "REDACTED"
         }
       },
-      "package": "com.anonymous.forkyou"
+      "package": "com.anonymous.rekkus"
     },
     "web": {
       "bundler": "metro",
@@ -45,7 +45,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow forkyou to use your location for nearby search results."
+          "locationWhenInUsePermission": "Allow Rekkus to use your location for nearby search results."
         }
       ],
       [

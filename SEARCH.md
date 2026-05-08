@@ -1,16 +1,18 @@
 # Search — Design Reference
 
-How search works in forkyou. Update this file whenever scoring weights, pipeline logic, or ranking strategy changes.
+How search works in Rekkus. Update this file whenever scoring weights, pipeline logic, or ranking strategy changes.
+
+Event tracking, trending data, and the `analytics_events` table are documented in [ANALYTICS.md](ANALYTICS.md).
 
 ---
 
 ## What we search
 
-| Type | Data sources | Searchable fields |
-|---|---|---|
-| **Posts** | `PostsContext` (Supabase + mock) | title, cuisine_type, tags, location, creator, body |
-| **People** | `MOCK_USERS` + Supabase `users` table | username, full_name |
-| **Places** | `RESTAURANTS` mock + Supabase `restaurants` + Google Places Autocomplete | name, cuisine_type, city, address |
+| Type       | Data sources                                                             | Searchable fields                                  |
+| ---------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| **Posts**  | `PostsContext` (Supabase + mock)                                         | title, cuisine_type, tags, location, creator, body |
+| **People** | `MOCK_USERS` + Supabase `users` table                                    | username, full_name                                |
+| **Places** | `RESTAURANTS` mock + Supabase `restaurants` + Google Places Autocomplete | name, cuisine_type, city, address                  |
 
 ---
 
@@ -33,62 +35,108 @@ All signals are **additive** — text score is primary, everything else is a boo
 ### Text scoring
 
 #### Posts
-| Field | Score per word |
-|---|---|
-| title | +3 |
-| cuisine_type (direct) | +3 |
-| cuisine_type (via synonym) | +2 |
-| tags | +2 |
-| location | +2 |
-| creator | +1.5 |
-| body | +1 |
+
+| Field                      | Score per word |
+| -------------------------- | -------------- |
+| title                      | +3             |
+| cuisine_type (direct)      | +3             |
+| cuisine_type (via synonym) | +2             |
+| tags                       | +2             |
+| location                   | +2             |
+| creator                    | +1.5           |
+| body                       | +1             |
 
 #### People
-| Match type | Score |
-|---|---|
-| Exact username or name word match | +4 |
-| Username starts with word | +3 |
-| Username or name contains word | +2 |
+
+| Match type                        | Score |
+| --------------------------------- | ----- |
+| Exact username or name word match | +4    |
+| Username starts with word         | +3    |
+| Username or name contains word    | +2    |
 
 #### Places
-| Field | Match type | Score per word |
-|---|---|---|
-| name | Strong (word covers ≥80% of token) | +3 |
-| name | Weak (word covers 40–79% of token) | +1 |
-| cuisine_type (direct) | substring | +2 |
-| cuisine_type (via synonym) | via `CUISINE_SYNONYMS` map | +2 |
-| city | Strong token match | +1 |
-| city | Weak token match | +0.33 |
-| address | Strong token match | +1 |
-| address | Weak token match | +0.33 |
+
+| Field                      | Match type                         | Score per word |
+| -------------------------- | ---------------------------------- | -------------- |
+| name                       | Strong (word covers ≥80% of token) | +3             |
+| name                       | Weak (word covers 40–79% of token) | +1             |
+| cuisine_type (direct)      | substring                          | +2             |
+| cuisine_type (via synonym) | via `CUISINE_SYNONYMS` map         | +2             |
+| city                       | Strong token match                 | +1             |
+| city                       | Weak token match                   | +0.33          |
+| address                    | Strong token match                 | +1             |
+| address                    | Weak token match                   | +0.33          |
 
 The tiered token scoring prevents "indian" from matching "Indianapolis" at full strength — "indianapolis" is only 50% covered by "indian" (< 80%), so it scores at 33% weight. The restaurant still appears, just ranked below actual Indian restaurants.
 
 ### Quality boost (posts)
+
 | Food rating | Boost |
-|---|---|
-| ≥ 4.5 | +1.5 |
-| ≥ 4.0 | +0.5 |
+| ----------- | ----- |
+| ≥ 4.5       | +1.5  |
+| ≥ 4.0       | +0.5  |
 
 ### Popularity boost (places)
-Measured by number of forkyou posts linked to that restaurant (`post.restaurantId`).
+
+Measured by number of Rekkus posts linked to that restaurant (`post.restaurantId`).
 
 | Post count | Boost |
-|---|---|
-| ≥ 5 posts | +1.5 |
-| ≥ 2 posts | +0.75 |
-| ≥ 1 post | +0.25 |
+| ---------- | ----- |
+| ≥ 5 posts  | +1.5  |
+| ≥ 2 posts  | +0.75 |
+| ≥ 1 post   | +0.25 |
+
+### Rekkus avg food rating boost (places)
+
+Average `food_rating` across all linked posts for this restaurant.
+
+| Avg food rating | Boost |
+| --------------- | ----- |
+| ≥ 4.5           | +2.0  |
+| ≥ 4.0           | +1.0  |
+| ≥ 3.5           | +0.5  |
+
+### Google rating boost (places)
+
+Cached from Google Places Details API when a user first views a location detail page. Stored in `restaurants.google_rating` and `restaurants.google_review_count`.
+
+| Google star rating | Boost |
+| ------------------ | ----- |
+| ≥ 4.5              | +1.5  |
+| ≥ 4.0              | +0.75 |
+
+| Review count | Boost |
+| ------------ | ----- |
+| ≥ 500        | +1.0  |
+| ≥ 100        | +0.5  |
+| ≥ 20         | +0.25 |
+
+### In-app interaction boost (places)
+
+30-day count of `place_click` + `place_view` events from `analytics_events`. See [ANALYTICS.md](ANALYTICS.md) for the full event schema.
+
+| 30-day interactions | Boost |
+| ------------------- | ----- |
+| ≥ 50                | +2.0  |
+| ≥ 20                | +1.0  |
+| ≥ 5                 | +0.5  |
+| ≥ 1                 | +0.25 |
+
+### Google Autocomplete food-type boost
+
+Google Autocomplete returns a `types` array per prediction. Food establishments (`restaurant`, `food`, `cafe`, `meal_takeaway`, `bakery`, `bar`) get +2.0. Non-food places (churches, laundries, consulates) get no boost and naturally rank below restaurants.
 
 ### Distance boost (posts + places)
+
 Requires GPS via `expo-location` (`lib/hooks/useUserLocation.ts`).
 
 | Distance | Boost |
-|---|---|
-| < 500 m | +5 |
-| < 2 km | +3 |
-| < 5 km | +1.5 |
-| < 15 km | +0.5 |
-| ≥ 15 km | 0 |
+| -------- | ----- |
+| < 500 m  | +5    |
+| < 2 km   | +3    |
+| < 5 km   | +1.5  |
+| < 15 km  | +0.5  |
+| ≥ 15 km  | 0     |
 
 Google Autocomplete also receives `location={lat},{lng}&radius=10000` when GPS is available.
 
@@ -99,6 +147,7 @@ Google Autocomplete also receives `location={lat},{lng}&radius=10000` when GPS i
 `CUISINE_SYNONYMS` in `lib/hooks/useSearch.ts` maps dish/ingredient queries to cuisine types. When a search word has no direct text match, we check if the word maps to a cuisine and score against `cuisine_type`.
 
 Examples:
+
 - `ramen` → `['japanese']` — a Japanese restaurant scores +2 even if "ramen" isn't in its name
 - `curry` → `['indian']`
 - `dumpling` → `['chinese', 'asian']`
@@ -112,17 +161,17 @@ Synonym expansion only applies when no direct match was found for that word (i.e
 
 How Yelp, Uber Eats, Google Maps, Zomato, and DoorDash handle search ranking:
 
-| Signal | Yelp | Uber Eats | Google Maps | Zomato | forkyou |
-|---|---|---|---|---|---|
-| Text relevance | ✓ TF-IDF + LTR | ✓ | ✓ | ✓ LTR | ✓ tiered scoring |
-| Proximity | ✓ | ✓ | ✓ | ✓ | ✓ haversine boost |
-| Ratings / quality | ✓ | ✓ | ✓ | ✓ | ✓ food rating boost |
-| Popularity (post volume) | ✓ | ✓ | ✓ prominence | ✓ | ✓ post count boost |
-| Cuisine synonym expansion | ✓ | ✓ knowledge graph | partial | partial | ✓ synonym map |
-| Open/closed signal | partial | ✓ | ✓ | ✓ | ✗ |
-| Personalisation | ✓ | ✓ | ✓ | ✓ | ✗ |
-| Time-of-day signals | partial | ✓ | ✓ | ✓ | ✗ |
-| Query expansion (zero results) | ✓ | ✓ query2vec | ✓ | ✓ | ✗ |
+| Signal                         | Yelp           | Uber Eats         | Google Maps  | Zomato  | Rekkus              |
+| ------------------------------ | -------------- | ----------------- | ------------ | ------- | ------------------- |
+| Text relevance                 | ✓ TF-IDF + LTR | ✓                 | ✓            | ✓ LTR   | ✓ tiered scoring    |
+| Proximity                      | ✓              | ✓                 | ✓            | ✓       | ✓ haversine boost   |
+| Ratings / quality              | ✓              | ✓                 | ✓            | ✓       | ✓ food rating boost |
+| Popularity (post volume)       | ✓              | ✓                 | ✓ prominence | ✓       | ✓ post count boost  |
+| Cuisine synonym expansion      | ✓              | ✓ knowledge graph | partial      | partial | ✓ synonym map       |
+| Open/closed signal             | partial        | ✓                 | ✓            | ✓       | ✗                   |
+| Personalisation                | ✓              | ✓                 | ✓            | ✓       | ✗                   |
+| Time-of-day signals            | partial        | ✓                 | ✓            | ✓       | ✗                   |
+| Query expansion (zero results) | ✓              | ✓ query2vec       | ✓            | ✓       | ✗                   |
 
 ### Key findings
 
@@ -140,14 +189,20 @@ How Yelp, Uber Eats, Google Maps, Zomato, and DoorDash handle search ranking:
 
 ## Tuning log
 
-| Date | Change | Reason |
-|---|---|---|
-| 2026-05-08 | Initial text scoring weights | Baseline |
-| 2026-05-08 | Added distance boost + Google location bias | Nearby results should rank above distant ones for generic queries |
-| 2026-05-08 | Tiered token scoring for place name/city/address fields | "indian" was ranking equal to "Indianapolis" — now: strong match (≥80% coverage) = full score, weak (40–79%) = 33%. Irrelevant places still show up, just ranked below relevant ones |
-| 2026-05-08 | Cuisine synonym map (`CUISINE_SYNONYMS`) | "ramen" now surfaces Japanese restaurants even without "ramen" in the name — mirrors Uber Eats knowledge graph approach at our scale |
-| 2026-05-08 | Quality boost for posts (food rating) | Higher-rated posts float above equal-scored ones — mirrors Yelp/Google quality signal |
-| 2026-05-08 | Popularity boost for places (forkyou post count) | Places with more community activity rank higher — mirrors Google prominence signal |
+| Date       | Change                                                               | Reason                                                                                                                                                                               |
+| ---------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-05-08 | Initial text scoring weights                                         | Baseline                                                                                                                                                                             |
+| 2026-05-08 | Added distance boost + Google location bias                          | Nearby results should rank above distant ones for generic queries                                                                                                                    |
+| 2026-05-08 | Tiered token scoring for place name/city/address fields              | "indian" was ranking equal to "Indianapolis" — now: strong match (≥80% coverage) = full score, weak (40–79%) = 33%. Irrelevant places still show up, just ranked below relevant ones |
+| 2026-05-08 | Cuisine synonym map (`CUISINE_SYNONYMS`)                             | "ramen" now surfaces Japanese restaurants even without "ramen" in the name — mirrors Uber Eats knowledge graph approach at our scale                                                 |
+| 2026-05-08 | Quality boost for posts (food rating)                                | Higher-rated posts float above equal-scored ones — mirrors Yelp/Google quality signal                                                                                                |
+| 2026-05-08 | Popularity boost for places (Rekkus post count)                      | Places with more community activity rank higher — mirrors Google prominence signal                                                                                                   |
+| 2026-05-08 | Rekkus avg food rating boost per restaurant                          | Community-rated places surface above unrated ones                                                                                                                                    |
+| 2026-05-08 | Google rating + review count boost (cached lazily)                   | Industry-standard quality signal; populates on first location detail view                                                                                                            |
+| 2026-05-08 | 30-day in-app interaction boost (place_click + place_view)           | Trending and popular places rank higher — data from analytics_events                                                                                                                 |
+| 2026-05-08 | Google Autocomplete food-type boost (+2.0)                           | Churches, laundries, consulates rank below food establishments without hard-excluding them                                                                                           |
+| 2026-05-08 | Google results merged into scored pool (not appended)                | All results sorted together by final score; non-food places still visible, just lower                                                                                                |
+| 2026-05-08 | Added Indonesian, Korean, Mediterranean cuisines to CUISINE_SYNONYMS | rendang/nasi → indonesian; bibimbap/kimchi → korean; mezze/tzatziki → mediterranean                                                                                                  |
 
 ---
 
@@ -164,17 +219,20 @@ How Yelp, Uber Eats, Google Maps, Zomato, and DoorDash handle search ranking:
 ## Improvement backlog
 
 ### High impact
+
 - [ ] **Open/closed signal**: demote currently-closed places slightly — requires fetching hours from Google Places API during search (expensive) or caching hours in Supabase `restaurants` table
 - [ ] **Personalisation**: boost cuisine types the user has posted/saved before; boost places already saved by the user
 - [ ] **Query expansion for zero results**: when a query returns nothing, expand to parent cuisine category (e.g. "tan tan noodles" → "Chinese")
 
 ### Medium impact
+
 - [ ] **Time-of-day hints**: weight brunch/breakfast queries higher in the morning, dinner queries in the evening
 - [ ] **PostGIS bounding box**: add `ST_DWithin` filter to Supabase query to pre-filter restaurants by distance before scoring
 - [ ] **Explore vs. popular balance**: give new restaurants without many posts a small visibility boost (DoorDash UCB approach) to avoid filter bubbles
 - [ ] **"Near you" label**: show "Showing results near Surry Hills" in section header when GPS active
 
 ### Low impact / future
+
 - [ ] Full-text search index on Supabase for posts (currently client-side only)
 - [ ] User-adjustable search radius in settings
 - [ ] Session-aware query chains (Zomato `search_id` pattern)

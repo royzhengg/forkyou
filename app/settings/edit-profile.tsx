@@ -1,33 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, Image,
-  ScrollView, ActivityIndicator, Alert,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import { Svg, Path } from 'react-native-svg'
 import { useThemeColors } from '@/lib/ThemeContext'
+import { ArrowLeft, CameraIcon } from '@/components/icons'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-
-function BackIcon() {
-  const colors = useThemeColors()
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M19 12H5M12 5l-7 7 7 7" />
-    </Svg>
-  )
-}
-
-function CameraIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <Path d="M12 9m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0" />
-    </Svg>
-  )
-}
 
 export default function EditProfileScreen() {
   const router = useRouter()
@@ -90,9 +79,14 @@ export default function EditProfileScreen() {
     const response = await fetch(uri)
     const blob = await response.blob()
     const arrayBuffer = await new Response(blob).arrayBuffer()
-    const { error } = await supabase.storage.from('avatars').upload(path, arrayBuffer, { contentType: `image/${ext}`, upsert: true })
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(path, arrayBuffer, { contentType: `image/${ext}`, upsert: true })
     setUploading(false)
-    if (error) { Alert.alert('Upload failed', error.message); return null }
+    if (error) {
+      Alert.alert('Upload failed', error.message)
+      return null
+    }
     const { data } = supabase.storage.from('avatars').getPublicUrl(path)
     return data.publicUrl
   }
@@ -102,17 +96,26 @@ export default function EditProfileScreen() {
     setLoading(true)
     let finalAvatarUrl = avatarUrl
     if (avatarUri) finalAvatarUrl = await uploadAvatar(avatarUri)
-    const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 30)
+    const cleanUsername = username
+      .toLowerCase()
+      .replace(/[^a-z0-9_.]/g, '')
+      .slice(0, 30)
     const error = await updateProfile(cleanUsername, displayName)
-    if (error) { Alert.alert('Error', error); setLoading(false); return }
-    await (supabase.from('users') as any).update({
-      bio,
-      avatar_url: finalAvatarUrl,
-      suburb: suburb.trim() || null,
-      city: city.trim() || null,
-      country: country.trim() || null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', user.id)
+    if (error) {
+      Alert.alert('Error', error)
+      setLoading(false)
+      return
+    }
+    await (supabase.from('users') as any)
+      .update({
+        bio,
+        avatar_url: finalAvatarUrl,
+        suburb: suburb.trim() || null,
+        city: city.trim() || null,
+        country: country.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
     setLoading(false)
     router.back()
   }
@@ -122,8 +125,12 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <BackIcon />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <ArrowLeft />
         </TouchableOpacity>
         <Text style={styles.title}>Edit profile</Text>
         <TouchableOpacity
@@ -131,28 +138,37 @@ export default function EditProfileScreen() {
           onPress={handleSave}
           disabled={!canSave || loading || uploading}
         >
-          {loading || uploading
-            ? <ActivityIndicator size="small" color={colors.bg} />
-            : <Text style={styles.saveBtnText}>Save</Text>
-          }
+          {loading || uploading ? (
+            <ActivityIndicator size="small" color={colors.bg} />
+          ) : (
+            <Text style={styles.saveBtnText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
-            {avatarUri || avatarUrl
-              ? <Image source={{ uri: avatarUri ?? avatarUrl! }} style={styles.avatar} />
-              : (
-                <View style={[styles.avatar, { backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }]}>
-                  <Text style={{ fontSize: 28, color: colors.text3 }}>
-                    {displayName.charAt(0).toUpperCase() || '?'}
-                  </Text>
-                </View>
-              )
-            }
+            {avatarUri || avatarUrl ? (
+              <Image source={{ uri: avatarUri ?? avatarUrl! }} style={styles.avatar} />
+            ) : (
+              <View
+                style={[
+                  styles.avatar,
+                  {
+                    backgroundColor: colors.surface2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                ]}
+              >
+                <Text style={{ fontSize: 28, color: colors.text3 }}>
+                  {displayName.charAt(0).toUpperCase() || '?'}
+                </Text>
+              </View>
+            )}
             <View style={styles.cameraOverlay}>
-              <CameraIcon />
+              <CameraIcon color="#fff" />
             </View>
           </TouchableOpacity>
           <Text style={styles.changePhotoText}>Change photo</Text>
@@ -166,7 +182,14 @@ export default function EditProfileScreen() {
               <TextInput
                 style={[styles.input, { flex: 1, backgroundColor: 'transparent' }]}
                 value={username}
-                onChangeText={t => setUsername(t.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 30))}
+                onChangeText={t =>
+                  setUsername(
+                    t
+                      .toLowerCase()
+                      .replace(/[^a-z0-9_.]/g, '')
+                      .slice(0, 30)
+                  )
+                }
                 placeholder="username"
                 placeholderTextColor={colors.text3}
                 autoCapitalize="none"
@@ -246,7 +269,14 @@ const AVATAR_SIZE = 88
 function makeStyles(c: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    topBar: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: c.border },
+    topBar: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+    },
     backBtn: { width: 56, alignItems: 'flex-start' },
     title: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '500', color: c.text },
     saveBtn: { width: 56, alignItems: 'flex-end', justifyContent: 'center' },
@@ -255,14 +285,40 @@ function makeStyles(c: ReturnType<typeof useThemeColors>) {
     avatarSection: { alignItems: 'center', paddingTop: 28, paddingBottom: 20 },
     avatarWrap: { position: 'relative' },
     avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
-    cameraOverlay: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: c.text, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: c.bg },
+    cameraOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.text,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: c.bg,
+    },
     changePhotoText: { marginTop: 10, fontSize: 13, color: c.info },
     form: { paddingHorizontal: 16, gap: 20, paddingBottom: 40 },
     fieldGroup: { gap: 6 },
     label: { fontSize: 12, fontWeight: '500', color: c.text2 },
-    inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
+    inputWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
     atPrefix: { fontSize: 14, color: c.text2, marginRight: 2 },
-    input: { backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: c.text },
+    input: {
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      color: c.text,
+    },
     bioInput: { height: 90, textAlignVertical: 'top', paddingTop: 12 },
     charCount: { fontSize: 11, color: c.text3, textAlign: 'right' },
   })

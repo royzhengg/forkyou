@@ -1,6 +1,13 @@
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useState, useMemo } from 'react'
@@ -13,7 +20,15 @@ import { supabase } from '@/lib/supabase'
 function ChevronLeft() {
   const colors = useThemeColors()
   return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.text2} strokeWidth={1.5} strokeLinecap="round">
+    <Svg
+      width={16}
+      height={16}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={colors.text2}
+      strokeWidth={1.5}
+      strokeLinecap="round"
+    >
       <Polyline points="15 18 9 12 15 6" />
     </Svg>
   )
@@ -34,7 +49,10 @@ export default function SignupProfileScreen() {
 
   const canSubmit = username.trim().length >= 3 && displayName.trim().length >= 1
 
-  const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 30)
+  const cleanUsername = username
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]/g, '')
+    .slice(0, 30)
 
   async function handleFinish() {
     if (!canSubmit || loading) return
@@ -48,7 +66,9 @@ export default function SignupProfileScreen() {
     }
     const loc = { suburb: suburb.trim() || null, city: city.trim() || null }
     if (loc.suburb || loc.city) {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (user) await (supabase.from('users') as any).update(loc).eq('id', user.id)
     }
     setLoading(false)
@@ -64,8 +84,15 @@ export default function SignupProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.title}>Your profile</Text>
           <Text style={styles.subtitle}>One last step.</Text>
 
@@ -79,7 +106,14 @@ export default function SignupProfileScreen() {
               placeholder="yourhandle"
               placeholderTextColor={colors.text3}
               value={username}
-              onChangeText={t => setUsername(t.toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 30))}
+              onChangeText={t =>
+                setUsername(
+                  t
+                    .toLowerCase()
+                    .replace(/[^a-z0-9_.]/g, '')
+                    .slice(0, 30)
+                )
+              }
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -95,7 +129,9 @@ export default function SignupProfileScreen() {
             onChangeText={setDisplayName}
           />
 
-          <Text style={[styles.label, { marginTop: 4 }]}>Suburb <Text style={styles.optional}>(optional)</Text></Text>
+          <Text style={[styles.label, { marginTop: 4 }]}>
+            Suburb <Text style={styles.optional}>(optional)</Text>
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="Surry Hills"
@@ -105,7 +141,9 @@ export default function SignupProfileScreen() {
             autoCapitalize="words"
           />
 
-          <Text style={[styles.label, { marginTop: 4 }]}>City <Text style={styles.optional}>(optional)</Text></Text>
+          <Text style={[styles.label, { marginTop: 4 }]}>
+            City <Text style={styles.optional}>(optional)</Text>
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="Sydney"
@@ -122,10 +160,11 @@ export default function SignupProfileScreen() {
             onPress={handleFinish}
             disabled={!canSubmit || loading}
           >
-            {loading
-              ? <ActivityIndicator color={colors.bg} />
-              : <Text style={styles.primaryBtnText}>Finish</Text>
-            }
+            {loading ? (
+              <ActivityIndicator color={colors.bg} />
+            ) : (
+              <Text style={styles.primaryBtnText}>Finish</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

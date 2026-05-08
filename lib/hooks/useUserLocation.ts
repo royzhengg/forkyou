@@ -6,10 +6,9 @@ type Coords = { lat: number; lng: number }
 let cached: Coords | null = null
 
 export function useUserLocation(): Coords | null {
-  const [location, setLocation] = useState<Coords | null>(cached)
+  const [location, setLocation] = useState<Coords | null>(null)
 
   useEffect(() => {
-    if (cached) return
     Location.requestForegroundPermissionsAsync()
       .then(({ status }) => {
         if (status !== 'granted') return null

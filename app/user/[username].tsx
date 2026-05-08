@@ -1,56 +1,16 @@
 import React, { useState, useMemo } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Image } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { imgColors } from '@/constants/Colors'
 import { useThemeColors } from '@/lib/ThemeContext'
 import { usePosts } from '@/lib/PostsContext'
 import { useAuth } from '@/lib/AuthContext'
 import { useAuthGate } from '@/lib/AuthGateContext'
 import { MOCK_USERS } from '@/lib/data'
-import { ChevronLeft, ImagePlaceholder } from '@/components/icons'
+import { ChevronLeft } from '@/components/icons'
 import { ProfileHeader } from '@/components/ProfileHeader'
-import type { Post } from '@/lib/data'
-
-function parseLikes(s: string): number {
-  return s.endsWith('k') ? parseFloat(s) * 1000 : parseInt(s, 10) || 0
-}
-
-const ThumbGrid = React.memo(function ThumbGrid({ posts }: { posts: Post[] }) {
-  const router = useRouter()
-  const { width } = useWindowDimensions()
-  const colors = useThemeColors()
-  const styles = useMemo(() => makeStyles(colors), [colors])
-  const thumbSize = (width - 4) / 3
-
-  if (posts.length === 0) {
-    return (
-      <View style={styles.emptyTab}>
-        <Text style={styles.emptyText}>No posts yet.{'\n'}Check back later.</Text>
-      </View>
-    )
-  }
-
-  return (
-    <View style={styles.thumbGrid}>
-      {posts.map(post => (
-        <TouchableOpacity
-          key={post.id}
-          style={[styles.thumb, { width: thumbSize, height: thumbSize }]}
-          onPress={() => router.push(`/post/${post.id}`)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.thumbInner, { backgroundColor: imgColors[post.imgKey] }]}>
-            {post.imageUrl
-              ? <Image source={{ uri: post.imageUrl }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
-              : <ImagePlaceholder size={20} />
-            }
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  )
-})
+import { ThumbGrid } from '@/components/ThumbGrid'
+import { parseLikes } from '@/lib/utils/format'
 
 export default function UserProfileScreen() {
   const { username } = useLocalSearchParams<{ username: string }>()
@@ -61,12 +21,10 @@ export default function UserProfileScreen() {
   const colors = useThemeColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const [following, setFollowing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const mockUser = MOCK_USERS[username ?? '']
-  const userPosts = useMemo(
-    () => posts.filter(p => p.creator === username),
-    [posts, username]
-  )
+  const userPosts = useMemo(() => posts.filter(p => p.creator === username), [posts, username])
 
   const badgeLabel = useMemo(() => {
     if (userPosts.length === 0) return null
@@ -97,7 +55,10 @@ export default function UserProfileScreen() {
     : null
 
   function handleFollow() {
-    if (!user) { requireAuth(); return }
+    if (!user) {
+      requireAuth()
+      return
+    }
     setFollowing(f => !f)
   }
 
@@ -108,11 +69,25 @@ export default function UserProfileScreen() {
           <ChevronLeft />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.username} numberOfLines={1}>@{username}</Text>
+        <Text style={styles.username} numberOfLines={1}>
+          @{username}
+        </Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true)
+              setRefreshing(false)
+            }}
+            tintColor={colors.text}
+          />
+        }
+      >
         <ProfileHeader
           initials={initials}
           avatarBg={avatarBg}
@@ -148,7 +123,13 @@ export default function UserProfileScreen() {
           <Text style={styles.tabHeaderText}>Posts</Text>
         </View>
 
-        <ThumbGrid posts={userPosts} />
+        {userPosts.length === 0 ? (
+          <View style={styles.emptyTab}>
+            <Text style={styles.emptyText}>{'No posts yet.\nCheck back later.'}</Text>
+          </View>
+        ) : (
+          <ThumbGrid posts={userPosts} />
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -157,22 +138,53 @@ export default function UserProfileScreen() {
 function makeStyles(c: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    topBar: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 0.5, borderBottomColor: c.border },
-    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, marginLeft: -6, width: 60 },
+    topBar: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+    },
+    backBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      padding: 6,
+      marginLeft: -6,
+      width: 60,
+    },
     backText: { fontSize: 14, color: c.text2 },
     username: { flex: 1, fontSize: 15, fontWeight: '500', color: c.text, textAlign: 'center' },
     actionBtns: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 18 },
-    followBtn: { flex: 1, backgroundColor: c.text, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+    followBtn: {
+      flex: 1,
+      backgroundColor: c.text,
+      borderRadius: 10,
+      paddingVertical: 9,
+      alignItems: 'center',
+    },
     followBtnActive: { backgroundColor: c.surface, borderWidth: 0.5, borderColor: c.border2 },
     followBtnText: { fontSize: 13, fontWeight: '500', color: c.bg },
     followBtnTextActive: { color: c.text },
-    messageBtn: { flex: 1, backgroundColor: c.surface, borderWidth: 0.5, borderColor: c.border2, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+    messageBtn: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderWidth: 0.5,
+      borderColor: c.border2,
+      borderRadius: 10,
+      paddingVertical: 9,
+      alignItems: 'center',
+    },
     messageBtnText: { fontSize: 13, fontWeight: '500', color: c.text },
-    tabHeader: { borderBottomWidth: 0.5, borderBottomColor: c.border, paddingHorizontal: 20, paddingVertical: 12, marginTop: 18 },
+    tabHeader: {
+      borderBottomWidth: 0.5,
+      borderBottomColor: c.border,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      marginTop: 18,
+    },
     tabHeaderText: { fontSize: 12, fontWeight: '500', color: c.text },
-    thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, padding: 2 },
-    thumb: { overflow: 'hidden' },
-    thumbInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyTab: { alignItems: 'center', justifyContent: 'center', padding: 50 },
     emptyText: { fontSize: 13, color: c.text3, textAlign: 'center', lineHeight: 20 },
   })
